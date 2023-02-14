@@ -40,8 +40,8 @@ using ElementLhs = ElementA;
 using ElementRhs = ElementB;
 using ElementResult = ElementC;
 
-using ThreadblockShape = cutlass::gemm::GemmShape<128, 128, 16>;
-using WarpShape = cutlass::gemm::GemmShape<64, 64, 16>;
+using ThreadblockShape = cutlass::gemm::GemmShape<128, 128, 32>;
+using WarpShape = cutlass::gemm::GemmShape<64, 64, 32>;
 using InstructionShape = cutlass::gemm::GemmShape<16, 8, 8>;
 
 using ThreadblockSwizzle = cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<1>;
@@ -277,13 +277,31 @@ int main() {
 
   // If requires more than 48KB: configure for extended, dynamic shared memory
   int smem_size = int(sizeof(typename ThreadblockMma::SharedStorage));
-  // std::cout << "smem_size: " << smem_size << std::endl;
+  std::cout << "smem_size: " << smem_size << std::endl;
+  cudaDeviceProp properties;
+  int device_idx;
   
+  result = cudaGetDevice(&device_idx);
+  if (result != cudaSuccess) {
+    throw std::runtime_error("cudaGetDevice() API call failed.");
+  }
+
+  result = cudaGetDeviceProperties(&properties, device_idx);
+  if (result != cudaSuccess) {
+    throw std::runtime_error("cudaGetDeviceProperties() failed");
+  }
+
+  if (properties.sharedMemPerBlockOptin < smem_size) {
+    std::cerr << "Shared memory size (" << properties.sharedMemPerBlockOptin << " bytes) "
+              << "exceeds the device limit. Please use a device with more shared memory." 
+              << std::endl;
+    throw std::runtime_error("cudaGetDeviceProperties() failed");
+  }
+
   if (smem_size >= (48 << 10)) {
     result = cudaFuncSetAttribute(iree_kernel,
                                   cudaFuncAttributeMaxDynamicSharedMemorySize, 
                                   smem_size);
-
     if (result != cudaSuccess) {
       std::cerr << "cudaFuncSetAttribute / cudaFuncAttributeMaxDynamicSharedMemorySize failed: " << cudaGetErrorString(result) << std::endl;
       return 1;
