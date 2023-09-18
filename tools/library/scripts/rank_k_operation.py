@@ -49,6 +49,10 @@ class RankKOperation:
     return False
 
   #
+  def is_mixed_input(self):
+    return False
+  
+  #
   def is_planar_complex(self):
     return False
 

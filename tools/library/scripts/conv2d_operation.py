@@ -40,6 +40,10 @@ class Conv2dOperation:
       MathOperation.multiply_add_complex_gaussian
       ]
     return self.tile_description.math_instruction.math_operation in complex_operators
+
+  #
+  def is_mixed_input(self):
+    return self.A.element != self.B.element
   
   #
   def accumulator_type(self):
