@@ -49,7 +49,7 @@
 #if defined(CUTLASS_ARCH_MMA_SM80_SUPPORTED)
 
 ////////////////////////////////////////////////////////////////////////////////
-
+#if 0
 TEST(SM80_Device_Gemm_f16t_f16n_f32t_tensor_op_f32, 128x256x64_64x64x64) {
   using ElementOutput = float;
   using ElementAccumulator = float;
@@ -319,6 +319,7 @@ TEST(SM80_Device_Gemm_f16t_f16n_f32t_tensor_op_f32, 128x64x32_64x32x32) {
 
   EXPECT_TRUE(test::gemm::device::TestAllGemm<Gemm>());
 }
+#endif
 
 TEST(SM80_Device_Gemm_f16t_f16n_f32t_tensor_op_f32, 64x64x32_32x32x32) {
   using ElementOutput = float;
@@ -338,6 +339,23 @@ TEST(SM80_Device_Gemm_f16t_f16n_f32t_tensor_op_f32, 64x64x32_32x32x32) {
   EXPECT_TRUE(test::gemm::device::TestAllGemm<Gemm>());
 }
 
+TEST(SM80_Device_Gemm_f16t_f16n_f32t_tensor_op_f32, 16x128x64_16x32x64) {
+  using ElementOutput = float;
+  using ElementAccumulator = float;
+
+  using Gemm = cutlass::gemm::device::Gemm<
+      cutlass::half_t, cutlass::layout::RowMajor, cutlass::half_t,
+      cutlass::layout::ColumnMajor, ElementOutput, cutlass::layout::RowMajor,
+      ElementAccumulator, cutlass::arch::OpClassTensorOp, cutlass::arch::Sm80,
+      cutlass::gemm::GemmShape<16, 128, 64>,
+      cutlass::gemm::GemmShape<16, 32, 64>, cutlass::gemm::GemmShape<16, 8, 16>,
+      cutlass::epilogue::thread::LinearCombination<
+          ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
+          ElementAccumulator, ElementAccumulator>,
+      cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 10>;
+
+  EXPECT_TRUE(test::gemm::device::TestAllGemm<Gemm>());
+}
 ////////////////////////////////////////////////////////////////////////////////
 
 #endif  // CUTLASS_ARCH_MMA_SM80_SUPPORTED

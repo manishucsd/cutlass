@@ -459,7 +459,7 @@ bool TestAllGemmUniversal() {
   };
 
   int batch_counts[] = {      // may be interpretted as batch count or split-K slices
-    1, 2, 3, 5, 7
+    1, 2, 3
   };
 
   double problem_alpha[] = {

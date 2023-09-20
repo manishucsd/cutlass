@@ -946,5 +946,6 @@ def CalculateSmemUsage(operation):
                      data_type_size_b * cta_shape[1] * cta_shape[2] // 8
 
   smem_usage = smem_per_stage * stages
+  print("operation = %s, smem usage = %d" % (operation.procedural_name(), (smem_usage >> 10)))
   return (smem_usage >> 10)
 ###################################################################################################
