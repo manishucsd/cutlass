@@ -430,6 +430,8 @@ bool TestAllGemmBasic(
                           (cutlass::platform::is_same<typename Gemm::LayoutA, cutlass::layout::RowMajor>::value ||
                           cutlass::platform::is_same<typename Gemm::LayoutB, cutlass::layout::ColumnMajor>::value) ? 4 : kAlignment;
 
+  std::cout << "GEMM alignment (problme shape): " << kAlignmentM << ", " << kAlignmentN << ", " << kAlignmentK << std::endl;
+
   int problem_size_m[] = {kAlignmentM, 512 - 3 * kAlignmentM};
 
   int problem_size_n[] = {kAlignmentN, 512 - 2 * kAlignmentN};
@@ -457,7 +459,7 @@ bool TestAllGemmBasic(
     for (int n : problem_size_n) {
       for (int k : problem_size_k) {
         for (int split_k : split_k_slices) {
-
+          std::cout << "Gemm problem (Trying): " << m << "x" << n << "x" << k << ", split_k: " << split_k << std::endl;
           if (!Gemm::kSplitKSerial && split_k > 1) {
             continue;
           }
@@ -470,6 +472,7 @@ bool TestAllGemmBasic(
             for (auto beta : problem_beta) {
 
               cutlass::gemm::GemmCoord problem_size(m, n, k);
+              std::cout << "Gemm problem (Running): " << m << "x" << n << "x" << k << ", split_k: " << split_k << std::endl;
               passed = testbed.run(
                 problem_size, 
                 split_k,

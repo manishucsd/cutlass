@@ -195,7 +195,7 @@ struct TestbedUniversal {
 
     if (!passed) {
 
-      /*
+    
       std::stringstream fname;
 
       fname << "error_Gemm_device_"
@@ -210,9 +210,10 @@ struct TestbedUniversal {
         << Gemm::WarpShape::kK << ".txt";
 
       std::ofstream file(fname.str());
-      */
+      
+      std::cout << "Writing results to " << fname.str() << std::endl;
 
-      std::ofstream file("testbed_universal_errors.txt");
+      // std::ofstream file("testbed_universal_errors.txt");
 
       file
         << "problem: " << problem_size
@@ -279,6 +280,8 @@ struct TestbedUniversal {
 
     int smem_size = int(sizeof(typename Gemm::GemmKernel::SharedStorage));
 
+    std::cout << "Shared memory size: " << (smem_size >> 10) << " KB" << std::endl;
+
     cudaDeviceProp properties;
     int device_idx;
     cudaError_t result = cudaGetDevice(&device_idx);
@@ -308,7 +311,7 @@ struct TestbedUniversal {
     ElementCompute alpha = ElementCompute(1),
     ElementCompute beta = ElementCompute(0))
   {
-/*
+
     std::cout << "\n-----------------------\n";
     std::cout << "mode: " << (int) mode << "\n";
     std::cout << "problem size: " << problem_size << "\n";
@@ -316,7 +319,9 @@ struct TestbedUniversal {
     std::cout << "alpha: " << alpha << "\n";
     std::cout << "beta: " << beta << "\n";
     std::cout << "-----------------------\n\n";
-*/
+    std::cout << std::endl;
+    std::cout.flush();
+
 
     // Waive test if insufficient CUDA device
     if (!sufficient()) {
@@ -413,7 +418,6 @@ template <typename Gemm, bool Relu = false>
 bool TestAllGemmUniversal() {
   bool passed = true;
 
-
   int const kMinimumOperandElementSize = 
     std::min(
       int(cutlass::sizeof_bits<typename Gemm::ElementA>::value), 
@@ -439,13 +443,16 @@ bool TestAllGemmUniversal() {
                           cutlass::platform::is_same<typename Gemm::LayoutB, cutlass::layout::ColumnMajor>::value) ? 4 : kAlignment;
 
 
+  std::cout << "kAlignmentM: " << kAlignmentM << std::endl;
+  std::cout << "kAlignmentN: " << kAlignmentN << std::endl;
+  std::cout << "kAlignmentK: " << kAlignmentK << std::endl;
 
   cutlass::gemm::GemmUniversalMode modes[] = {
     cutlass::gemm::GemmUniversalMode::kGemm,
   };
 
   int problem_size_m[] = {
-    kAlignmentM, 512 - 3*kAlignmentM
+     kAlignmentM, 512 - 3*kAlignmentM
   };
 
   int problem_size_n[] = {
@@ -481,6 +488,8 @@ bool TestAllGemmUniversal() {
 
             for (auto alpha : problem_alpha) {
               for (auto beta : problem_beta) {
+                std::cout << "Gemm Problem (Trying) : "
+                          << cutlass::gemm::GemmCoord(m, n, k) << std::endl;
 
                 if (mode == cutlass::gemm::GemmUniversalMode::kGemm ||
                   mode == cutlass::gemm::GemmUniversalMode::kGemmSplitKParallel) {
@@ -490,10 +499,12 @@ bool TestAllGemmUniversal() {
                     continue;
                   }
                 }
-
                 cutlass::gemm::GemmCoord problem_size(m, n, k);
 
                 TestbedUniversal<Gemm, Relu> testbed;
+                
+                std::cout << "Gemm Problem (Running) : "
+                          << cutlass::gemm::GemmCoord(m, n, k) << std::endl;
 
                 passed = testbed.run(
                   mode,

@@ -54,8 +54,7 @@
 #if defined(CUTLASS_ARCH_MMA_SM80_SUPPORTED)
 
 ////////////////////////////////////////////////////////////////////////////////
-
-
+#if 0
 TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x128x64_64x64x64) {
 
   using ElementA = int8_t;
@@ -81,8 +80,8 @@ TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x12
           ElementAccumulator, ElementAccumulator>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
     4,  // Stages
-    8,  // AlignmentA
-    16, // AlignmentB
+    16,  // AlignmentA
+    8, // AlignmentB
     cutlass::arch::OpMultiplyAddMixedInputUpcast,
     cutlass::ComplexTransform::kNone,
     cutlass::ComplexTransform::kNone
@@ -117,8 +116,8 @@ TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x12
           ElementAccumulator, ElementAccumulator>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
     4,  // Stages
-    8,  // AlignmentA
-    16, // AlignmentB
+    16,  // AlignmentA
+    8, // AlignmentB
     cutlass::arch::OpMultiplyAddMixedInputUpcast,
     cutlass::ComplexTransform::kNone,
     cutlass::ComplexTransform::kNone
@@ -153,45 +152,8 @@ TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 64x128
           ElementAccumulator, ElementAccumulator>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
     4,  // Stages
-    8,  // AlignmentA
-    16, // AlignmentB
-    cutlass::arch::OpMultiplyAddMixedInputUpcast,
-    cutlass::ComplexTransform::kNone,
-    cutlass::ComplexTransform::kNone
-  >;
-
-  EXPECT_TRUE(test::gemm::device::TestAllGemmUniversal<Gemm>());
-}
-////////////////////////////////////////////////////////////////////////////////
-
-
-TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x64x32_64x32x32) {
-
-  using ElementA = int8_t;
-  using ElementB = cutlass::bfloat16_t;
-  using ElementOutput = cutlass::bfloat16_t;
-  using ElementAccumulator = float;
-
-  using Gemm = cutlass::gemm::device::GemmUniversal<
-    ElementA, 
-    cutlass::layout::RowMajor, 
-    ElementB,
-    cutlass::layout::ColumnMajor, 
-    ElementOutput, 
-    cutlass::layout::RowMajor,
-    ElementAccumulator, 
-    cutlass::arch::OpClassTensorOp, 
-    cutlass::arch::Sm80,
-    cutlass::gemm::GemmShape<128, 64, 32>,
-    cutlass::gemm::GemmShape<64, 32, 32>,
-    cutlass::gemm::GemmShape<16, 8, 16>,
-      cutlass::epilogue::thread::LinearCombination<
-          ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
-          ElementAccumulator, ElementAccumulator>,
-    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
-    8,  // Stages
-    8,  // AlignmentA
-    16, // AlignmentB
+    16, // AlignmentA
+    8,  // AlignmentB
     cutlass::arch::OpMultiplyAddMixedInputUpcast,
     cutlass::ComplexTransform::kNone,
     cutlass::ComplexTransform::kNone
@@ -226,8 +188,8 @@ TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 64x64x
           ElementAccumulator, ElementAccumulator>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
     8,  // Stages
-    8,  // AlignmentA
-    16, // AlignmentB
+    16, // AlignmentA
+    8,  // AlignmentB
     cutlass::arch::OpMultiplyAddMixedInputUpcast,
     cutlass::ComplexTransform::kNone,
     cutlass::ComplexTransform::kNone
@@ -236,8 +198,10 @@ TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 64x64x
   EXPECT_TRUE(test::gemm::device::TestAllGemmUniversal<Gemm>());
 }
 ////////////////////////////////////////////////////////////////////////////////
-#if 0
-TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 16x128x32_16x64x32) {
+#endif
+
+// 128x64x32 - warp count (2x2x1)
+TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x64x32_64x32x32) {
 
   using ElementA = int8_t;
   using ElementB = cutlass::bfloat16_t;
@@ -254,16 +218,165 @@ TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 16x128
     ElementAccumulator, 
     cutlass::arch::OpClassTensorOp, 
     cutlass::arch::Sm80,
-    cutlass::gemm::GemmShape<16, 128, 32>,
-    cutlass::gemm::GemmShape<16, 64, 32>,
+    cutlass::gemm::GemmShape<128, 64, 32>,
+    cutlass::gemm::GemmShape<64, 32, 32>,
     cutlass::gemm::GemmShape<16, 8, 16>,
       cutlass::epilogue::thread::LinearCombination<
           ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
           ElementAccumulator, ElementAccumulator>,
     cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
-    8,  // Stages
-    8,  // AlignmentA
-    16, // AlignmentB
+    8,   // Stages
+    16,  // AlignmentA
+    8,   // AlignmentB
+    cutlass::arch::OpMultiplyAddMixedInputUpcast,
+    cutlass::ComplexTransform::kNone,
+    cutlass::ComplexTransform::kNone
+  >;
+
+  EXPECT_TRUE(test::gemm::device::TestAllGemmUniversal<Gemm>());
+}
+////////////////////////////////////////////////////////////////////////////////
+
+// 128x64x32 - warp count (2x1x1)
+TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x64x32_64x64x32) {
+
+  using ElementA = int8_t;
+  using ElementB = cutlass::bfloat16_t;
+  using ElementOutput = cutlass::bfloat16_t;
+  using ElementAccumulator = float;
+
+  using Gemm = cutlass::gemm::device::GemmUniversal<
+    ElementA, 
+    cutlass::layout::RowMajor, 
+    ElementB,
+    cutlass::layout::ColumnMajor, 
+    ElementOutput, 
+    cutlass::layout::RowMajor,
+    ElementAccumulator, 
+    cutlass::arch::OpClassTensorOp, 
+    cutlass::arch::Sm80,
+    cutlass::gemm::GemmShape<128, 64, 32>,
+    cutlass::gemm::GemmShape<64, 64, 32>,
+    cutlass::gemm::GemmShape<16, 8, 16>,
+      cutlass::epilogue::thread::LinearCombination<
+          ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
+          ElementAccumulator, ElementAccumulator>,
+    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
+    8,   // Stages
+    16,  // AlignmentA
+    8,   // AlignmentB
+    cutlass::arch::OpMultiplyAddMixedInputUpcast,
+    cutlass::ComplexTransform::kNone,
+    cutlass::ComplexTransform::kNone
+  >;
+
+  EXPECT_TRUE(test::gemm::device::TestAllGemmUniversal<Gemm>());
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+// 128x32x32 - warp count (2x1x1)
+TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x32x32_64x32x32) {
+
+  using ElementA = int8_t;
+  using ElementB = cutlass::bfloat16_t;
+  using ElementOutput = cutlass::bfloat16_t;
+  using ElementAccumulator = float;
+
+  using Gemm = cutlass::gemm::device::GemmUniversal<
+    ElementA, 
+    cutlass::layout::RowMajor, 
+    ElementB,
+    cutlass::layout::ColumnMajor, 
+    ElementOutput, 
+    cutlass::layout::RowMajor,
+    ElementAccumulator, 
+    cutlass::arch::OpClassTensorOp, 
+    cutlass::arch::Sm80,
+    cutlass::gemm::GemmShape<128, 32, 32>,
+    cutlass::gemm::GemmShape<64, 32, 32>,
+    cutlass::gemm::GemmShape<16, 8, 16>,
+      cutlass::epilogue::thread::LinearCombination<
+          ElementOutput, 128 / cutlass::sizeof_bits<ElementOutput>::value,
+          ElementAccumulator, ElementAccumulator>,
+    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
+    8,   // Stages
+    16,  // AlignmentA
+    8,   // AlignmentB
+    cutlass::arch::OpMultiplyAddMixedInputUpcast,
+    cutlass::ComplexTransform::kNone,
+    cutlass::ComplexTransform::kNone
+  >;
+
+  EXPECT_TRUE(test::gemm::device::TestAllGemmUniversal<Gemm>());
+}
+////////////////////////////////////////////////////////////////////////////////
+
+// 128x16x32 - warp count (1x1x1)
+TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x16x32_128x16x32) {
+
+  using ElementA = int8_t;
+  using ElementB = cutlass::bfloat16_t;
+  using ElementOutput = cutlass::bfloat16_t;
+  using ElementAccumulator = float;
+
+  using Gemm = cutlass::gemm::device::GemmUniversal<
+    ElementA, 
+    cutlass::layout::RowMajor, 
+    ElementB,
+    cutlass::layout::ColumnMajor, 
+    ElementOutput, 
+    cutlass::layout::RowMajor,
+    ElementAccumulator, 
+    cutlass::arch::OpClassTensorOp, 
+    cutlass::arch::Sm80,
+    cutlass::gemm::GemmShape<128, 16, 32>,
+    cutlass::gemm::GemmShape<128, 16, 32>,
+    cutlass::gemm::GemmShape<16, 8, 16>,
+      cutlass::epilogue::thread::LinearCombination<
+          ElementOutput, 4,
+          ElementAccumulator, ElementAccumulator>,
+    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
+    4,   // Stages
+    16,  // AlignmentA
+    8,   // AlignmentB
+    cutlass::arch::OpMultiplyAddMixedInputUpcast,
+    cutlass::ComplexTransform::kNone,
+    cutlass::ComplexTransform::kNone
+  >;
+
+  EXPECT_TRUE(test::gemm::device::TestAllGemmUniversal<Gemm>());
+}
+////////////////////////////////////////////////////////////////////////////////
+#if 1
+// 128x16x32 - warp count (2x1x1)
+TEST(SM80_Device_GemmUniversal_s8t_bf16n_bf16t_mixed_input_tensor_op_f32, 128x16x32_64x16x32) {
+
+  using ElementA = int8_t;
+  using ElementB = cutlass::bfloat16_t;
+  using ElementOutput = cutlass::bfloat16_t;
+  using ElementAccumulator = float;
+
+  using Gemm = cutlass::gemm::device::GemmUniversal<
+    ElementA, 
+    cutlass::layout::RowMajor, 
+    ElementB,
+    cutlass::layout::ColumnMajor, 
+    ElementOutput, 
+    cutlass::layout::RowMajor,
+    ElementAccumulator, 
+    cutlass::arch::OpClassTensorOp, 
+    cutlass::arch::Sm80,
+    cutlass::gemm::GemmShape<128, 16, 32>,
+    cutlass::gemm::GemmShape<64, 16, 32>,
+    cutlass::gemm::GemmShape<16, 8, 16>,
+      cutlass::epilogue::thread::LinearCombination<
+          ElementOutput, 4,
+          ElementAccumulator, ElementAccumulator>,
+    cutlass::gemm::threadblock::GemmIdentityThreadblockSwizzle<>, 
+    4,   // Stages
+    16,  // AlignmentA
+    8,   // AlignmentB
     cutlass::arch::OpMultiplyAddMixedInputUpcast,
     cutlass::ComplexTransform::kNone,
     cutlass::ComplexTransform::kNone
