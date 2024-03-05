@@ -124,14 +124,15 @@ tma_test_device_cute(T const* g_in, T* g_out,
   {
     // Set the bytes transferred in this TMA transaction (may involve multiple issues)
     constexpr int kTmaTransactionBytes = sizeof(ArrayEngine<T, size(sA)>);
+    
+    /// Initialize shared memory barrier
+    tma_load_mbar[0] = 0;
+    cute::initialize_barrier(tma_load_mbar[0], 1 /*numThreads*/);
+
 
     if (threadIdx.x == 0)
     {
-      /// Initialize shared memory barrier
-      tma_load_mbar[0] = 0;
-      cute::initialize_barrier(tma_load_mbar[0], 1 /*numThreads*/);
       cute::set_barrier_transaction_bytes(tma_load_mbar[0], kTmaTransactionBytes);
-
       copy(tma.with(tma_load_mbar[0]), tAgA(_,stage), tAsA(_,0));
     }
     __syncthreads();
