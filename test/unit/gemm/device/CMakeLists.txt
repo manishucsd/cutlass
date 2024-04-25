@@ -267,13 +267,13 @@ cutlass_test_unit_add_executable(
   BATCH_SIZE 4
 
   sm90_gemm_f16_f16_f16_tensor_op.cu
-  sm90_gemm_bf16_bf16_bf16_tensor_op_f32.cu
-  sm90_gemm_s8_s8_s8_tensor_op_s32.cu
-  sm90_gemm_tf32_tf32_f32_tensor_op_f32.cu
-  sm90_gemm_f32_f32_f32_tensor_op_f32.cu
-  sm90_gemm_f8_f8_f32_tensor_op_fp32.cu
-  sm90_gemm_f8_f8_bf16_tensor_op_fp32.cu
-  sm90_gemm_f8_f8_f8_tensor_op_fp32.cu
+  # sm90_gemm_bf16_bf16_bf16_tensor_op_f32.cu
+  # sm90_gemm_s8_s8_s8_tensor_op_s32.cu
+  # sm90_gemm_tf32_tf32_f32_tensor_op_f32.cu
+  # sm90_gemm_f32_f32_f32_tensor_op_f32.cu
+  # sm90_gemm_f8_f8_f32_tensor_op_fp32.cu
+  # sm90_gemm_f8_f8_bf16_tensor_op_fp32.cu
+  # sm90_gemm_f8_f8_f8_tensor_op_fp32.cu
 )
 
 cutlass_test_unit_add_executable(

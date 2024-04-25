@@ -192,7 +192,8 @@ template <GMMA::Major MajorMode, class TEngine, class TLayout>
 CUTE_HOST_DEVICE constexpr
 GmmaDescriptor
 make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
-{
+{  
+
   static_assert(is_smem<TEngine>::value, "GMMA Descriptors can only be constructed on smem.");
   static_assert(TLayout::rank == 2, "GMMA Descriptors can only be constructed on rank-2 tensors.");
   using value_type = typename TEngine::value_type;
@@ -251,6 +252,19 @@ make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
 
     desc.bitfield.stride_byte_offset_  = (LAYOUT_TYPE == GMMA::LayoutType::INTERLEAVE) ? stride_01 : stride_11;
     desc.bitfield.leading_byte_offset_ = (LAYOUT_TYPE == GMMA::LayoutType::INTERLEAVE) ? stride_11 : stride_01;
+
+    if (blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && threadIdx.x == 128) {
+      print(">>>> GMMA::Major::MN\n");
+      printf("tensor: "); print(tensor); printf("\n");
+      printf("MN-major u128_tensor: "); print(layout(u128_tensor));  printf("\n");
+      printf("make_tile(Layout<Int<W>,_1>{}, Layout<Int<8>,_1>{})r: "); print(make_tile(Layout<Int<W>,_1>{}, Layout<Int<8>,_1>{})); printf("\n");
+      printf("MN major canonical_layout: "); print(canonical_layout); printf("\n");
+      printf("stride_01: "); print(stride_01); printf("\n");
+      printf("stride_11: "); print(stride_11); printf("\n");
+      printf("desc.bitfield.stride_byte_offset_ : %d\n", desc.bitfield.stride_byte_offset_);
+      printf("desc.bitfield.leading_byte_offset_: %d\n", desc.bitfield.leading_byte_offset_);
+    }
+
   }
   else if constexpr (MajorMode == GMMA::Major::K)
   {
@@ -285,6 +299,18 @@ make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
 
     desc.bitfield.stride_byte_offset_  = stride_01;
     desc.bitfield.leading_byte_offset_ = stride_10;
+
+    if (blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && threadIdx.x == 128) {
+      print(">> GMMA::Major::K\n");
+      printf("tensor: "); print(tensor); printf("\n");
+      printf("K-major u128_tensor: "); print(layout(u128_tensor));  printf("\n");
+      printf("make_tile(Layout<Int<W>,_1>{}, Layout<Int<8>,_1>{})r: "); print(make_tile(Layout<Int<W>,_1>{}, Layout<Int<8>,_1>{})); printf("\n");
+      printf("MN major canonical_layout: "); print(canonical_layout); printf("\n");
+      printf("stride_01: "); print(stride_01); printf("\n");
+      printf("stride_10: "); print(stride_10); printf("\n");
+      printf("desc.bitfield.stride_byte_offset_ : %d\n", desc.bitfield.stride_byte_offset_);
+      printf("desc.bitfield.leading_byte_offset_: %d\n", desc.bitfield.leading_byte_offset_);
+    }
   } else {
     static_assert(MajorMode != GMMA::Major::MN && MajorMode != GMMA::Major::K, "Unrecognized MajorMode!");
   }
@@ -301,6 +327,9 @@ make_gmma_desc(Tensor<TEngine,TLayout> const& tensor)
   }
 #endif
 
+  if (blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && threadIdx.x == 128) {
+    print(desc);
+  }
   return desc;
 }
 

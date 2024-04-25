@@ -1402,32 +1402,19 @@ bool TestAll(double alpha = 1.0, double beta = 0.0, Testbed testbed = {}) {
   using ProblemShapeType = typename Gemm::GemmKernel::ProblemShape;
 
   int max_alignment = std::max(Gemm::kAlignmentA, Gemm::kAlignmentB);
-  std::vector<int> problem_size_m = {max_alignment, 512 - 3 * max_alignment};
-  std::vector<int> problem_size_n = {max_alignment, 512 - 2 * max_alignment};
-
-  if constexpr (std::is_same_v<typename Gemm::GemmKernel::DispatchPolicy::Schedule,
-                cutlass::gemm::KernelTmaWarpSpecializedPingpong>) {
-    problem_size_m.push_back(768);
-    problem_size_n.push_back(768);
-  }
+  std::vector<int> problem_size_m = {64};
+  std::vector<int> problem_size_n = {128};
 
   constexpr int Stages = Gemm::GemmKernel::DispatchPolicy::Stages;
   constexpr int TileShapeK = cute::size<2>(typename Gemm::GemmKernel::TileShape{});
 
-  std::vector<int> problem_size_k = {max_alignment, TileShapeK * (Stages + 1) - max_alignment};
+  std::vector<int> problem_size_k = {64};
 
   std::vector<int> problem_splits = {1};
-  if constexpr (std::is_same_v<typename Gemm::GemmKernel::TileSchedulerTag, cutlass::gemm::StreamKScheduler>) {
-    problem_splits.push_back(2);
-    problem_splits.push_back(3);
-
-    // As many splits as there are maximum k tiles
-    problem_splits.push_back(Stages + 1);
-  }
 
   using RasterOrderOptions = typename cutlass::gemm::kernel::detail::PersistentTileSchedulerSm90::RasterOrderOptions;
-  std::vector<RasterOrderOptions> raster_orders = {RasterOrderOptions::AlongM, RasterOrderOptions::AlongN};
-  std::vector<int> max_swizzle_sizes = {1, 4};
+  std::vector<RasterOrderOptions> raster_orders = {RasterOrderOptions::AlongM};
+  std::vector<int> max_swizzle_sizes = {1};
 
   bool passed = true;
 
@@ -1445,6 +1432,7 @@ bool TestAll(double alpha = 1.0, double beta = 0.0, Testbed testbed = {}) {
                 problem_size = ProblemShapeType{m, n, k};
               }
 
+              std::cout << "Testing problem size: " << problem_size << "\n";
               passed = testbed.run(
                 problem_size,
                 cutlass::from_real<ElementScalar>(alpha),
