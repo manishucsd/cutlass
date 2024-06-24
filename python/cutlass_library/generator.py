@@ -5631,7 +5631,8 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
 
   # layouts for ABC and their alignments
   layouts = [
-    [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.ColumnMajor, 1]],  # TN Layout
+    [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.ColumnMajor, 1]],  # TN Layout (ColumnMajor output)
+    [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.RowMajor, 1]],  # TN Layout (RowMajor output)
   ]
 
   math_instructions = [
@@ -5639,21 +5640,6 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
     MathInstruction(
       [64, 128, 32],
       DataType.e4m3, DataType.e4m3, DataType.f32,
-      OpcodeClass.TensorOp,
-      MathOperation.multiply_add),
-    MathInstruction(
-      [64, 128, 32],
-      DataType.e4m3, DataType.e5m2, DataType.f32,
-      OpcodeClass.TensorOp,
-      MathOperation.multiply_add),
-    MathInstruction(
-      [64, 128, 32],
-      DataType.e5m2, DataType.e4m3, DataType.f32,
-      OpcodeClass.TensorOp,
-      MathOperation.multiply_add),
-    MathInstruction(
-      [64, 128, 32],
-      DataType.e5m2, DataType.e5m2, DataType.f32,
       OpcodeClass.TensorOp,
       MathOperation.multiply_add),
   ]
@@ -5742,7 +5728,7 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
         "a_type"   : math_inst.element_a,
         "b_type"   : math_inst.element_b,
         "c_type"   : DataType.void,
-        "d_type"   : DataType.e5m2,
+        "d_type"   : DataType.bf16,
         "acc_type" : math_inst.element_accumulator,
         "epi_type" : math_inst.element_accumulator
       },
@@ -5750,7 +5736,7 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
         "a_type"   : math_inst.element_a,
         "b_type"   : math_inst.element_b,
         "c_type"   : DataType.void,
-        "d_type"   : DataType.e4m3,
+        "d_type"   : DataType.bf16,
         "acc_type" : math_inst.element_accumulator,
         "epi_type" : math_inst.element_accumulator
       }
@@ -5772,10 +5758,33 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
           0, [4, 1, 1], math_inst, min_cc, max_cc, [2,1,1]),
       ]
       tile_descriptions = [
+        # 64x128x128
+        TileDescription([math_inst.instruction_shape[0], math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [1,2,1]),
+        TileDescription([math_inst.instruction_shape[0], math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [2,1,1]),
         # 128x128x128
         TileDescription([math_inst.instruction_shape[0]*2, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
           0, [4, 1, 1], math_inst, min_cc, max_cc, [1,2,1]),
         TileDescription([math_inst.instruction_shape[0]*2, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [2,1,1]),
+        # 256x128x128
+        TileDescription([math_inst.instruction_shape[0]*4, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [1,2,1]),
+        TileDescription([math_inst.instruction_shape[0]*4, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [2,1,1]),
+      ]
+  
+      tile_descriptions_cooperative = [
+        # 128x128x128
+        TileDescription([math_inst.instruction_shape[0]*2, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [1,2,1]),
+        TileDescription([math_inst.instruction_shape[0]*2, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [2,1,1]),
+        # 256x128x128
+        TileDescription([math_inst.instruction_shape[0]*4, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
+          0, [4, 1, 1], math_inst, min_cc, max_cc, [1,2,1]),
+        TileDescription([math_inst.instruction_shape[0]*4, math_inst.instruction_shape[1], math_inst.instruction_shape[2]*4],
           0, [4, 1, 1], math_inst, min_cc, max_cc, [2,1,1]),
       ]
 
@@ -5792,7 +5801,7 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
         [KernelScheduleType.TmaWarpSpecializedCooperativeFP8FastAccum, EpilogueScheduleType.NoSmemWarpSpecialized],
         [KernelScheduleType.TmaWarpSpecializedFP8FastAccum,            EpilogueScheduleType.NoSmemWarpSpecialized]
       ]
-      stream_k_schedules = [[KernelScheduleType.TmaWarpSpecializedCooperative,             EpilogueScheduleType.NoSmemWarpSpecialized],
+      stream_k_schedules = [#[KernelScheduleType.TmaWarpSpecializedCooperative,             EpilogueScheduleType.NoSmemWarpSpecialized],
                             [KernelScheduleType.TmaWarpSpecializedCooperativeFP8FastAccum, EpilogueScheduleType.NoSmemWarpSpecialized]]
     else:
       schedules = [
@@ -5802,6 +5811,19 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
       ]
       stream_k_schedules = []
 
+    CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions, data_types_large_tile,
+          [#[KernelScheduleType.TmaWarpSpecializedCooperative,         EpilogueScheduleType.TmaWarpSpecializedCooperative],
+           [KernelScheduleType.TmaWarpSpecializedFP8FastAccum,         EpilogueScheduleType.NoSmemWarpSpecialized],
+           [KernelScheduleType.TmaWarpSpecializedPingpongFP8FastAccum, EpilogueScheduleType.TmaWarpSpecialized],
+           [KernelScheduleType.TmaWarpSpecializedPingpongFP8FastAccum, EpilogueScheduleType.NoSmemWarpSpecialized]])
+
+    CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions_cooperative, data_types_large_tile,
+          [#[KernelScheduleType.TmaWarpSpecializedCooperative,             EpilogueScheduleType.TmaWarpSpecializedCooperative],
+           [KernelScheduleType.TmaWarpSpecializedCooperativeFP8FastAccum, EpilogueScheduleType.TmaWarpSpecializedCooperative],
+           [KernelScheduleType.TmaWarpSpecializedCooperativeFP8FastAccum, EpilogueScheduleType.NoSmemWarpSpecialized]])
+
+    CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions_cooperative, data_types_large_tile, stream_k_schedules, tile_schedulers=[TileSchedulerType.StreamK])
+    '''
     for data_type in data_types:
       # With No-SMEM epilogues
       CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions, data_type, schedules)
@@ -5829,6 +5851,7 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
           [[KernelScheduleType.TmaWarpSpecializedCooperative,             EpilogueScheduleType.TmaWarpSpecializedCooperative],
            [KernelScheduleType.TmaWarpSpecializedCooperativeFP8FastAccum, EpilogueScheduleType.TmaWarpSpecializedCooperative]],
           tile_schedulers=[TileSchedulerType.StreamK])
+    '''
 
 #
 def GenerateSM90_TensorOp_fp8_WGMMA_alignx_gemm(manifest, cuda_version):
