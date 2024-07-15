@@ -5631,7 +5631,7 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
 
   # layouts for ABC and their alignments
   layouts = [
-    [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.ColumnMajor, 1]],  # TN Layout
+    [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.RowMajor, 1]],  # TN Layout
   ]
 
   math_instructions = [
@@ -5691,6 +5691,14 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
         "a_type"   : math_inst.element_a,
         "b_type"   : math_inst.element_b,
         "c_type"   : DataType.bf16,
+        "d_type"   : DataType.bf16,
+        "acc_type" : math_inst.element_accumulator,
+        "epi_type" : math_inst.element_accumulator
+      },
+      {
+        "a_type"   : math_inst.element_a,
+        "b_type"   : math_inst.element_b,
+        "c_type"   : DataType.void,
         "d_type"   : DataType.bf16,
         "acc_type" : math_inst.element_accumulator,
         "epi_type" : math_inst.element_accumulator
@@ -5804,7 +5812,13 @@ def GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version):
 
     for data_type in data_types:
       # With No-SMEM epilogues
-      CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions, data_type, schedules)
+      #CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions, data_type, schedules)
+      CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions, data_type, [
+           [KernelScheduleType.TmaWarpSpecialized,             EpilogueScheduleType.NoSmemWarpSpecialized],
+           [KernelScheduleType.TmaWarpSpecializedFP8FastAccum, EpilogueScheduleType.NoSmemWarpSpecialized]])
+      CreateGemmUniversal3xOperator(manifest, layouts, tile_descriptions_small, data_type, [
+           [KernelScheduleType.TmaWarpSpecialized,             EpilogueScheduleType.NoSmemWarpSpecialized],
+           [KernelScheduleType.TmaWarpSpecializedFP8FastAccum, EpilogueScheduleType.NoSmemWarpSpecialized]])
 
       if CudaToolkitVersionSatisfies(cuda_version, 12, 1):
         # Persistent kernels with TMA epilogues
@@ -6712,27 +6726,27 @@ def GenerateSM90_Conv3x(manifest, cuda_version,
                            log_indent_level = log_indent_level)
 
 def GenerateSM90(manifest, cuda_version):
-  GenerateSM90_TensorOp_16b_WGMMA_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_16b_WGMMA_alignx_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_tf32_WGMMA_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_tf32_WGMMA_alignx_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_int8_WGMMA_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_int8_WGMMA_alignx_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_16b_WGMMA_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_16b_WGMMA_alignx_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_tf32_WGMMA_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_tf32_WGMMA_alignx_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_int8_WGMMA_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_int8_WGMMA_alignx_gemm(manifest, cuda_version)
   GenerateSM90_TensorOp_fp8_WGMMA_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_fp8_WGMMA_alignx_gemm(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_complex(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_complex_gaussian(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_rank_k(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_rank_k_complex(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_rank_k_complex_gaussian(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_trmm(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_trmm_complex(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_trmm_complex_gaussian(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_symm(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_symm_complex(manifest, cuda_version)
-  GenerateSM90_TensorOp_1684_symm_complex_gaussian(manifest, cuda_version)
-  GenerateSM90_Conv3x(manifest, cuda_version)
+  #GenerateSM90_TensorOp_fp8_WGMMA_alignx_gemm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_complex(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_complex_gaussian(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_rank_k(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_rank_k_complex(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_rank_k_complex_gaussian(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_trmm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_trmm_complex(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_trmm_complex_gaussian(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_symm(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_symm_complex(manifest, cuda_version)
+  #GenerateSM90_TensorOp_1684_symm_complex_gaussian(manifest, cuda_version)
+  #GenerateSM90_Conv3x(manifest, cuda_version)
 
 ###################################################################################################
 
@@ -6786,13 +6800,13 @@ if __name__ == "__main__":
 
   manifest = Manifest(args)
 
-  GenerateSM50(manifest, args.cuda_version)
-  GenerateSM60(manifest, args.cuda_version)
-  GenerateSM61(manifest, args.cuda_version)
-  GenerateSM70(manifest, args.cuda_version)
-  GenerateSM75(manifest, args.cuda_version)
-  GenerateSM80(manifest, args.cuda_version)
-  GenerateSM89(manifest, args.cuda_version)
+  #GenerateSM50(manifest, args.cuda_version)
+  #GenerateSM60(manifest, args.cuda_version)
+  #GenerateSM61(manifest, args.cuda_version)
+  #GenerateSM70(manifest, args.cuda_version)
+  #GenerateSM75(manifest, args.cuda_version)
+  #GenerateSM80(manifest, args.cuda_version)
+  #GenerateSM89(manifest, args.cuda_version)
   GenerateSM90(manifest, args.cuda_version)
   if 'library' in args.generator_target.split(','):
     manifest.emit(GeneratorTarget.Library)

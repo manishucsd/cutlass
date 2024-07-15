@@ -38,6 +38,7 @@
 #include "cutlass/library/library.h"
 #include "library_internal.h"
 #include "cutlass/gemm/dispatch_policy.hpp"
+#include "cutlass/library/util.h"
 #include <unordered_map>
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -119,6 +120,7 @@ public:
     description_.A = make_TensorDescription<ElementA, LayoutA>(Operator::kAlignmentA);
     description_.B = make_TensorDescription<ElementB, LayoutB>(Operator::kAlignmentB);
     description_.C = make_TensorDescription<ElementC, LayoutC>(Operator::kAlignmentC);
+    std::cout << "description_.C.element " << cutlass::library::to_string(description_.C.element) << std::endl;
     description_.D = make_TensorDescription<ElementD, LayoutD>(Operator::kAlignmentD);
     description_.element_epilogue = NumericTypeMap<ElementCompute>::kId;
 
