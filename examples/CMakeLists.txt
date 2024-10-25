@@ -140,6 +140,7 @@ foreach(EXAMPLE
   57_hopper_grouped_gemm
   58_ada_fp8_gemm
   59_ampere_gather_scatter_conv
+  61_hopper_fp8_warp_specialized_gemm_with_blockwise_scaling
   )
 
   add_subdirectory(${EXAMPLE})

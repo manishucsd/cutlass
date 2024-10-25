@@ -144,7 +144,7 @@ using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBui
     FusionOperation
   >::CollectiveOp;
 
-using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
+using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBlockScalingBuilder<
     ArchTag, OperatorClass,
     ElementA, LayoutA, AlignmentA,
     ElementB, LayoutB, AlignmentB,
