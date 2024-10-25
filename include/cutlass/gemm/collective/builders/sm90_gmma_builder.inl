@@ -1042,6 +1042,109 @@ static constexpr bool IsMixedWidthInput = IsDifferentWidth || (IsDifferentWidth 
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+// GMMA_TMA_WS_SS
+template <
+  class ElementA,
+  class GmemLayoutATag,
+  int AlignmentA,
+  class ElementB,
+  class GmemLayoutBTag,
+  int AlignmentB,
+  class ElementAccumulator,
+  class TileShape_MNK,
+  class ClusterShape_MNK,
+  class StageCountType,
+  class KernelScheduleType
+>
+struct CollectiveBlockScalingBuilder<
+    arch::Sm90,
+    arch::OpClassTensorOp,
+    ElementA,
+    GmemLayoutATag,
+    AlignmentA,
+    ElementB,
+    GmemLayoutBTag,
+    AlignmentB,
+    ElementAccumulator,
+    TileShape_MNK,
+    ClusterShape_MNK,
+    StageCountType,
+    KernelScheduleType,
+    cute::enable_if_t<
+      (cute::is_same_v<KernelScheduleType, KernelTmaWarpSpecialized> ||
+       cute::is_same_v<KernelScheduleType, KernelTmaWarpSpecializedPingpong> ||
+       cute::is_same_v<KernelScheduleType, KernelTmaWarpSpecializedCooperative> ||
+       cute::is_same_v<KernelScheduleType, KernelPtrArrayTmaWarpSpecializedCooperative>) &&
+       not detail::is_use_rmem_A<ElementA, GmemLayoutATag, ElementB, GmemLayoutBTag>()>
+> {
+  static_assert(is_static<TileShape_MNK>::value);
+  static_assert(is_static<ClusterShape_MNK>::value);
+#ifndef CUTLASS_SM90_COLLECTIVE_BUILDER_SUPPORTED
+  static_assert(cutlass::detail::dependent_false<ElementA>, "Unsupported Toolkit for SM90 Collective Builder\n");
+#endif
+  static_assert(detail::is_aligned<ElementA, AlignmentA, ElementB, AlignmentB, detail::tma_alignment_bytes>(),
+                "Should meet TMA alignment requirement\n");
+
+  static constexpr bool IsArrayOfPointersGemm = (cute::is_same_v<KernelScheduleType, KernelPtrArrayTmaWarpSpecializedCooperative>);
+  static constexpr bool IsFP8Input = detail::is_input_fp8<ElementA, ElementB>();
+  static_assert(!IsFP8Input || (IsFP8Input && !IsArrayOfPointersGemm),
+                "Kernel[Array/Group]TmaWarpSpecializedCooperative is only compatible with FP8 FastAccum version right now\n");
+
+  // For fp32 types, map to tf32 MMA value type
+  using ElementAMma = cute::conditional_t<cute::is_same_v<ElementA, float>, tfloat32_t, ElementA>;
+  using ElementBMma = cute::conditional_t<cute::is_same_v<ElementB, float>, tfloat32_t, ElementB>;
+
+  static constexpr cute::GMMA::Major GmmaMajorA = detail::gmma_ss_tag_to_major_A<ElementAMma, GmemLayoutATag>();
+  static constexpr cute::GMMA::Major GmmaMajorB = detail::gmma_ss_tag_to_major_B<ElementBMma, GmemLayoutBTag>();
+
+  using AtomLayoutMNK = cute::conditional_t<
+      cute::is_same_v<KernelScheduleType, KernelTmaWarpSpecializedCooperative> || IsArrayOfPointersGemm,
+      Layout<Shape<_2,_1,_1>>, Layout<Shape<_1,_1,_1>>>;
+
+  using TiledMma = decltype(cute::make_tiled_mma(cute::GMMA::ss_op_selector<
+      ElementAMma, ElementBMma, ElementAccumulator, TileShape_MNK, GmmaMajorA, GmmaMajorB>(), AtomLayoutMNK{}));
+
+  using GmemTiledCopyA = decltype(detail::sm90_cluster_shape_to_tma_atom(shape<1>(ClusterShape_MNK{})));
+  using GmemTiledCopyB = decltype(detail::sm90_cluster_shape_to_tma_atom(shape<0>(ClusterShape_MNK{})));
+
+  using SmemLayoutAtomA = decltype(detail::ss_smem_selector<
+      GmmaMajorA, ElementAMma, decltype(cute::get<0>(TileShape_MNK{})), decltype(cute::get<2>(TileShape_MNK{}))>());
+  using SmemLayoutAtomB = decltype(detail::ss_smem_selector<
+      GmmaMajorB, ElementBMma, decltype(cute::get<1>(TileShape_MNK{})), decltype(cute::get<2>(TileShape_MNK{}))>());
+
+  static constexpr int PipelineStages = detail::compute_stage_count_or_override<detail::sm90_smem_capacity_bytes,
+      ElementAMma, ElementBMma, TileShape_MNK>(StageCountType{});
+  using DispatchPolicy = cute::conditional_t<IsArrayOfPointersGemm,
+      MainloopSm90ArrayTmaGmmaWarpSpecialized<PipelineStages, ClusterShape_MNK, KernelScheduleType>,
+      /* For FP8 use a separate mainloop compared to other datatypes */
+      cute::conditional_t<IsFP8Input,
+          MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8<PipelineStages, ClusterShape_MNK, KernelScheduleType>,
+          MainloopSm90TmaGmmaWarpSpecialized<PipelineStages, ClusterShape_MNK, KernelScheduleType>>>;
+
+  using SmemCopyAtomA = void; 
+  using SmemCopyAtomB = void; 
+
+  using CollectiveOp = CollectiveMma<
+      DispatchPolicy,
+      TileShape_MNK,
+      ElementA,
+      TagToStrideA_t<GmemLayoutATag>,
+      ElementB,
+      TagToStrideB_t<GmemLayoutBTag>,
+      TiledMma,
+      GmemTiledCopyA,
+      SmemLayoutAtomA,
+      SmemCopyAtomA,
+      cute::identity,
+      GmemTiledCopyB,
+      SmemLayoutAtomB,
+      SmemCopyAtomB,
+      cute::identity
+    >;
+};
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 } // namespace cutlass::gemm::collective
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
