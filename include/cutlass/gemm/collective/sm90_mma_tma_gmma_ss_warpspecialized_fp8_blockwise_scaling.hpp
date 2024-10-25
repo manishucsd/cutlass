@@ -43,7 +43,6 @@
 #include "cute/atom/mma_atom.hpp"
 #include "cute/algorithm/gemm.hpp"
 #include "cute/tensor_predicate.hpp"
-#include "cute/tensor.hpp"
 #include "cute/numeric/arithmetic_tuple.hpp"
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,7 +72,7 @@ template <
   class SmemCopyAtomB_,
   class TransformB_>
 struct CollectiveMma<
-    MainloopSm90TmaGmmaWarpSpecializedFP8<Stages, ClusterShape, KernelSchedule>,
+    MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8<Stages, ClusterShape, KernelSchedule>,
     TileShape_,
     ElementA_,
     StrideA_,
@@ -92,7 +91,7 @@ struct CollectiveMma<
   //
   // Type Aliases
   //
-  using DispatchPolicy = MainloopSm90TmaGmmaWarpSpecializedFP8<Stages, ClusterShape, KernelSchedule>;
+  using DispatchPolicy = MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8<Stages, ClusterShape, KernelSchedule>;
   using TileShape = TileShape_;
   using ElementA = ElementA_;
   using StrideA = StrideA_;
@@ -100,6 +99,7 @@ struct CollectiveMma<
   using StrideB = StrideB_;
   using TiledMma = TiledMma_;
   using ElementAccumulator = typename TiledMma::ValTypeC;
+  using ElementScale = ElementAccumulator;
   using GmemTiledCopyA = GmemTiledCopyA_;
   using GmemTiledCopyB = GmemTiledCopyB_;
   using SmemLayoutAtomA = SmemLayoutAtomA_;
@@ -152,9 +152,16 @@ struct CollectiveMma<
 
     using PipelineStorage = typename MainloopPipeline::SharedStorage;
     PipelineStorage pipeline;
+
+    // Shared storage for per block scaling factors for A and B
+    struct ScaleStorage : cute::aligned_struct<128> {
+      cute::array_aligned<ElementScale, Int<DispatchPolicy::Stages>{}> smem_scale_A; // 1x4
+      cute::array_aligned<ElementScale, Int<DispatchPolicy::Stages>{}> smem_scale_B; // 1x4
+    } scaling_tensors;
   };
   using TensorStorage = typename SharedStorage::TensorStorage;
   using PipelineStorage = typename SharedStorage::PipelineStorage;
+  using ScaleStorage = typename SharedStorage::ScaleStorage;
 
   // Host side kernel arguments
   struct Arguments {
@@ -163,6 +170,9 @@ struct CollectiveMma<
     ElementB const* ptr_B;
     StrideB dB;
     uint32_t mma_promotion_interval = 4;
+    // Block scaling factors for A and B
+    ElementScale const* ptr_scale_A; 
+    ElementScale const* ptr_scale_B;
   };
 
   // Device side kernel params
@@ -187,6 +197,9 @@ struct CollectiveMma<
     uint32_t tma_transaction_bytes_mk = TmaTransactionBytesMK;
     uint32_t tma_transaction_bytes_nk = TmaTransactionBytesNK;
     uint32_t mma_promotion_interval = 4;
+    // Block scaling factors for A and B
+    ElementScale const* ptr_scale_A; 
+    ElementScale const* ptr_scale_B;
   };
 
   //
@@ -229,7 +242,9 @@ struct CollectiveMma<
       transaction_bytes,
       transaction_bytes_mk,
       transaction_bytes_nk,
-      args.mma_promotion_interval
+      args.mma_promotion_interval,
+      args.ptr_scale_A,
+      args.ptr_scale_B
     };
   }
 
@@ -293,6 +308,17 @@ struct CollectiveMma<
     Tensor gA_mkl = local_tile(mA_mkl, TileShape{}, make_coord(_,_,_), Step<_1, X,_1>{});        // (BLK_M,BLK_K,m,k,l)
     Tensor gB_nkl = local_tile(mB_nkl, TileShape{}, make_coord(_,_,_), Step< X,_1,_1>{});        // (BLK_N,BLK_K,n,k,l)
 
+    // Blockscaling
+    if(blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
+          threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
+      printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (load_init)\n");
+      print(gA_mkl.shape()); printf("\n");
+      print(get<2>(gA_mkl.shape())) ; printf("\n");
+    }
+
+    // auto scale_dA = make_stride() // (dM, dK)
+    // Tensor mScaleA_mkl = make_tensor(make_gmem_ptr(mainloop_params.ptr_scale_A), select<0,2>(TileShape{}));
+
     return cute::make_tuple(gA_mkl, gB_nkl);
   }
 
@@ -308,6 +334,7 @@ struct CollectiveMma<
       MainloopPipeline pipeline,
       PipelineState smem_pipe_write,
       cute::tuple<TensorA, TensorB> const& load_inputs,
+      // cute::tuple<TensorScaleA, TensorScaleB> const& load_scales, // Blockscaling
       BlockCoord const& blk_coord,
       KTileIterator k_tile_iter, int k_tile_count,
       int thread_idx,
@@ -315,6 +342,7 @@ struct CollectiveMma<
       TensorStorage& shared_tensors) {
     int lane_predicate = cute::elect_one_sync();
 
+    // Blockscaling: Tma loads for load_input and CpAsync for load_scale
     if (lane_predicate) {
       Tensor sA = make_tensor(make_smem_ptr(shared_tensors.smem_A.data()), SmemLayoutA{});        // (BLK_M,BLK_K,PIPE)
       Tensor sB = make_tensor(make_smem_ptr(shared_tensors.smem_B.data()), SmemLayoutB{});        // (BLK_N,BLK_K,PIPE)
@@ -329,6 +357,16 @@ struct CollectiveMma<
       Tensor gA_mkl = get<0>(load_inputs);
       Tensor gB_nkl = get<1>(load_inputs);
 
+      // Blockscaling: load_scale has scaling tensors in global memory which are not tiled
+#if 0
+      Tensor gScaleA_mkl_in = get<0>(load_scales);
+      Tensor gScaleB_nkl_in = get<1>(load_scales);
+      Tensor gScaleA_mkl = local_tile(gScaleA_mkl_in, TileShape{}, make_coord(_,_,_), Step<_1, X,_1>{});        // (1,1,m,k,l)
+      Tensor gScaleB_mkl = local_tile(gScaleB_nkl_in, TileShape{}, make_coord(_,_,_), Step< X,_1,_1>{});        // (1,1,n,k,l)
+      Tensor gScaleA = gScaleA_mkl(_,_,m_coord,_,l_coord);                                           // (1,BLK_K,1)
+      Tensor gScaleB = gScaleB_mkl(_,_,n_coord,_,l_coord);                                            // (1,BLK_K,1)
+#endif
+
       auto block_tma_a = mainloop_params.tma_load_a.get_slice(cluster_local_block_id.y);
       auto block_tma_b = mainloop_params.tma_load_b.get_slice(cluster_local_block_id.x);
 
@@ -336,24 +374,17 @@ struct CollectiveMma<
       auto [m_coord, n_coord, k_coord, l_coord] = blk_coord;
       Tensor gA = gA_mkl(_,_,m_coord,_,l_coord);                                                     // (BLK_M,BLK_K,k)
       Tensor gB = gB_nkl(_,_,n_coord,_,l_coord);                                                     // (BLK_N,BLK_K,k)
-      
+
       if (blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
           threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-      // if (false) {
-        printf("MainloopSm90TmaGmmaWarpSpecializedFP8\n");
+        // if (false) {
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (load)\n");
         printf("blk_coord: "); print(blk_coord); printf("\n");
         printf("gA_mkl: "); cute::print(cute::layout(gA_mkl)); printf("\n");
         printf("gA: "); cute::print(cute::layout(gA)); printf("\n");
         printf("sA: "); cute::print(cute::layout(sA)); printf("\n");
-
-        /*
-        How to read this?
-          blk_coord: (0,0,_,0)
-          gA_mkl: (_128,_128,8,8,1):(_1@1,_1@0,_128@1,_128@0,_1@2) 1024x1024x1
-          gA: (_128,_128,8):(_1@1,_1@0,_128@0) 1
-          sA: (_128,_128,_6):(_128,_1,_16384)
-        */
       }
+
 
       // Applies the mapping from block_tma_a
       Tensor tAgA = block_tma_a.partition_S(gA);                                                 // (TMA,TMA_M,TMA_K,k)
@@ -397,6 +428,16 @@ struct CollectiveMma<
         int write_stage = smem_pipe_write.index();
         copy(mainloop_params.tma_load_a.with(*tma_barrier, mcast_mask_a), tAgA(_,_,_,*k_tile_iter), tAsA(_,_,_,write_stage));
         copy(mainloop_params.tma_load_b.with(*tma_barrier, mcast_mask_b), tBgB(_,_,_,*k_tile_iter), tBsB(_,_,_,write_stage));
+
+#if 0 // copy scaling factors to smem
+        // We need LDGSTS to be able to say to another warpgroup that inputs (A,B) and
+        // scaling factor (scaleA, scaleB) are ready for consumption. [Which is through a barrier]
+        copy(gmem_tiled_copy_A, tAgA(_,_,_,*k_tile_iter), tAsA(_,_,_,k_pipe));
+        copy(gmem_tiled_copy_B, tBgB(_,_,_,*k_tile_iter), tBsB(_,_,_,k_pipe));
+        cp_async_fence();
+        cp_async_wait<0>();
+#endif
+
         ++k_tile_iter;
 
         // Advance smem_pipe_write
