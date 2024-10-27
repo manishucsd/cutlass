@@ -340,11 +340,16 @@ struct CollectiveMma<
       if (blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
           threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
       // if (false) {
-        printf("MainloopSm90TmaGmmaWarpSpecializedFP8\n");
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8::load()\n");
         printf("blk_coord: "); print(blk_coord); printf("\n");
         printf("gA_mkl: "); cute::print(cute::layout(gA_mkl)); printf("\n");
         printf("gA: "); cute::print(cute::layout(gA)); printf("\n");
         printf("sA: "); cute::print(cute::layout(sA)); printf("\n");
+
+        printf("gB_nkl: "); cute::print(cute::layout(gB_nkl)); printf("\n");
+        printf("gB: "); cute::print(cute::layout(gB)); printf("\n");
+        printf("sB: "); cute::print(cute::layout(sB)); printf("\n"); 
+
 
         /*
         How to read this?

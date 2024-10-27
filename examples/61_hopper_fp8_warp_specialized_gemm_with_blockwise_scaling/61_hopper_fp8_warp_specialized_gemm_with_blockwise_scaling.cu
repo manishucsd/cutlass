@@ -122,6 +122,7 @@ using         ElementBias  = float;
 
 // Core kernel configurations
 using ElementAccumulator  = float;                                          // Element type for internal accumulation
+using ElementBlockScale = float;                                            // Element type for blockscaling during accumulation
 using ElementCompute      = float;                                          // Element type for epilogue computation
 using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
 using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
@@ -196,6 +197,9 @@ cutlass::HostTensor<ElementA  , LayoutA  > tensor_A;
 cutlass::HostTensor<ElementB  , LayoutB  > tensor_B;
 cutlass::HostTensor<ElementC  , LayoutC  > tensor_C;
 cutlass::HostTensor<ElementD  , LayoutD  > tensor_D;
+uint32_t mma_promotion_interval;
+cutlass::HostTensor<ElementBlockScale, LayoutA> blockscale_tensor_A;
+cutlass::HostTensor<ElementBlockScale, LayoutB> blockscale_tensor_B;
 cutlass::HostTensor<ElementD  , LayoutD  > tensor_ref_D;
 cutlass::HostTensor<ElementAux, LayoutAux> tensor_aux;
 cutlass::HostTensor<ElementAux, LayoutAux> tensor_ref_aux;
@@ -248,36 +252,55 @@ struct Result
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 /// Helper to initialize a block of device data
-template <typename Element, typename Layout>
-bool initialize_tensor(
-  cutlass::TensorView<Element, Layout> view,
-  uint64_t seed) {
+  template <typename Element, typename Layout>
+  bool initialize_tensor(
+    cutlass::TensorView<Element, Layout> view,
+    cutlass::Distribution::Kind dist_kind,
+    uint64_t seed) {
 
-  double scope_max, scope_min;
-  int bits_input = cutlass::sizeof_bits<Element>::value;
-  int bits_output = cutlass::sizeof_bits<Element>::value;
+    if (dist_kind == cutlass::Distribution::Uniform) {
 
-  if (bits_input == 1) {
-    scope_max = 2;
-    scope_min = 0;
-  }
-  else if (bits_input <= 8) {
-    scope_max = 2;
-    scope_min = -2;
-  }
-  else if (bits_output == 16) {
-    scope_max = 5;
-    scope_min = -5;
-  }
-  else {
-    scope_max = 8;
-    scope_min = -8;
-  }
-  cutlass::reference::host::TensorFillRandomUniform(
-    view, seed, scope_max, scope_min, 0);
+      double scope_max, scope_min;
+      int bits_input = cutlass::sizeof_bits<Element>::value;
+      int bits_output = cutlass::sizeof_bits<Element>::value;
 
-  return true;
-}
+      if (bits_input == 1) {
+        scope_max = 2;
+        scope_min = 0;
+      } else if (bits_input <= 8) {
+        scope_max = 2;
+        scope_min = -2;
+      } else if (bits_output == 16) {
+        scope_max = 5;
+        scope_min = -5;
+      } else {
+        scope_max = 8;
+        scope_min = -8;
+      }
+
+      cutlass::reference::host::TensorFillRandomUniform(
+        view, seed, scope_max, scope_min, 0);
+    }
+    else if (dist_kind == cutlass::Distribution::AllZeros) {
+      cutlass::reference::host::TensorFill(view);
+    }
+    else if (dist_kind == cutlass::Distribution::Identity) {
+
+      cutlass::reference::host::TensorFillIdentity(view);
+    }
+    else if (dist_kind == cutlass::Distribution::Gaussian) {
+
+      cutlass::reference::host::TensorFillRandomGaussian(view, seed, 0, 0.5);
+    }
+    else if (dist_kind == cutlass::Distribution::Sequential) {
+      cutlass::reference::host::BlockFillSequential(view.data(), view.capacity());
+    }
+    else {
+      throw std::runtime_error("Not implementated.");
+    }
+
+    return true;
+  }
 
 /// Initialize operands to be used in the GEMM and reference GEMM
 void initialize(const Options<RasterOrderOptions> &options) {
@@ -288,24 +311,56 @@ void initialize(const Options<RasterOrderOptions> &options) {
   stride_D = cutlass::make_cute_packed_stride(StrideD{}, cute::make_shape(options.m, options.n, options.l));
   stride_aux = stride_D;
 
+  // Find Block Scaling tensor shapes based on problem shape and TileShape
+  auto gemm_problem_shape = cute::make_shape(options.m, options.n, options.k);
+  auto temp = cute::zipped_divide(cute::make_layout(gemm_problem_shape), TileShape{});
+  auto blockscale_shape = shape(get<1>(temp));
+  printf("temp: "); cute::print(temp); printf("\n");
+  printf("blockscale_shape: "); cute::print(blockscale_shape); printf("\n");
+  auto blockscale_m = cute::get<0>(blockscale_shape);
+  auto blockscale_n = cute::get<1>(blockscale_shape);
+  auto blockscale_k = cute::get<2>(blockscale_shape);
+
   auto a_coord = cutlass::make_Coord(options.m * options.l, options.k);
   auto c_coord = cutlass::make_Coord(options.m * options.l, options.n);
   auto b_coord = cutlass::make_Coord(options.k, options.n * options.l);
+  auto blockscale_a_coord = cutlass::make_Coord(blockscale_m * options.l, blockscale_k);
+  auto blockscale_b_coord = cutlass::make_Coord(blockscale_k, blockscale_n * options.l);
 
   tensor_A.resize(a_coord);
+  blockscale_tensor_A.resize(blockscale_a_coord);
   tensor_B.resize(b_coord);
+  blockscale_tensor_B.resize(blockscale_b_coord);
   tensor_C.resize(c_coord);
   tensor_D.resize(c_coord);
   tensor_ref_D.resize(c_coord);
 
-  initialize_tensor(tensor_A.host_view(), seed + 2022);
-  initialize_tensor(tensor_B.host_view(), seed + 2023);
-  initialize_tensor(tensor_C.host_view(), seed + 2024);
+  cutlass::Distribution::Kind dist_A = cutlass::Distribution::Uniform;
+  cutlass::Distribution::Kind dist_B = cutlass::Distribution::Uniform;
+  cutlass::Distribution::Kind dist_C = cutlass::Distribution::Uniform;
+  cutlass::Distribution::Kind dist_scaleA = cutlass::Distribution::Sequential;
+  cutlass::Distribution::Kind dist_scaleB = cutlass::Distribution::Sequential;
 
+  initialize_tensor(tensor_A.host_view(), dist_A, seed + 2022);
+  initialize_tensor(tensor_B.host_view(), dist_B, seed + 2023);
+  initialize_tensor(tensor_C.host_view(), dist_C, seed + 2024);
+  initialize_tensor(blockscale_tensor_A.host_view(), dist_scaleA, seed + 2025);
+  initialize_tensor(blockscale_tensor_B.host_view(), dist_scaleB, seed + 2026);
+
+  std::cout << "blockscale_tensor_A" << blockscale_a_coord << std::endl;
+  std::cout << blockscale_tensor_A.host_view() << "\n";
+  std::cout << "blockscale_tensor_B" << blockscale_b_coord << std::endl;
+  std::cout << blockscale_tensor_B.host_view() << "\n";
+
+  // Print block scaling tensors on the host side.
   tensor_A.sync_device();
   tensor_B.sync_device();
   tensor_C.sync_device();
   tensor_D.sync_device();
+  blockscale_tensor_A.sync_device();
+  blockscale_tensor_B.sync_device();
+
+  mma_promotion_interval = 4;
 
   if (options.save_aux) {
     tensor_aux.resize(c_coord);
@@ -358,7 +413,14 @@ typename Gemm::Arguments args_from_options(const Options<RasterOrderOptions> &op
   typename Gemm::Arguments arguments{
     cutlass::gemm::GemmUniversalMode::kGemm,
     {options.m, options.n, options.k, options.l},
-    {tensor_A.device_data(), stride_A, tensor_B.device_data(), stride_B},
+    {tensor_A.device_data(),
+     stride_A,
+     tensor_B.device_data(),
+     stride_B,
+     mma_promotion_interval,
+     blockscale_tensor_A.device_data(),
+     blockscale_tensor_B.device_data()
+     },
     {
       {}, // epilogue.thread
       tensor_C.device_data(), stride_C,
