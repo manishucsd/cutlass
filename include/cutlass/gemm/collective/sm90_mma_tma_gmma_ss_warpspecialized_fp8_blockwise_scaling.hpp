@@ -33,7 +33,7 @@
 
 #include "cutlass/cutlass.h"
 #include "cutlass/gemm/dispatch_policy.hpp"
-#include "cutlass/gemm/collective/fp8_accumulation.hpp"
+#include "cutlass/gemm/collective/fp8_accumulation_with_blockscaling.hpp"
 #include "cutlass/trace.h"
 #include "cutlass/numeric_types.h"
 
@@ -464,8 +464,9 @@ struct CollectiveMma<
         }
       }
 
-      bool print_for =  (m_coord == 0 && n_coord == 0) &&
-                        (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) && true;
+
+      bool print_for =  (m_coord == 1 && n_coord == 1) &&
+                        (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) && false;
       if (print_for) {
         printf("m_coord=%d, n_coord=%d, blockIdx.x=%d, blockIdx.y=%d, blockIdx.z=%d\n", 
                 m_coord, n_coord, blockIdx.x, blockIdx.y, blockIdx.z); 
@@ -495,9 +496,9 @@ struct CollectiveMma<
         cp_async_wait<0>();
         if (print_for) {
           printf("gmem (*k_tile_iter=%d) shared_tensors.smem_scale_A[write_stage=%d] = %d\n", 
-                   *k_tile_iter, int(shared_tensors.smem_scale_A[write_stage]), write_stage);
+                   *k_tile_iter, write_stage, int(shared_tensors.smem_scale_A[write_stage]));
           printf("gmem (*k_tile_iter=%d) shared_tensors.smem_scale_B[write_stage=%d] = %d\n", 
-                   *k_tile_iter, int(shared_tensors.smem_scale_B[write_stage]), write_stage);
+                   *k_tile_iter, write_stage, int(shared_tensors.smem_scale_B[write_stage]));
         }
 #endif
 
@@ -552,6 +553,10 @@ struct CollectiveMma<
 
     Tensor sA = make_tensor(make_smem_ptr(shared_tensors.smem_A.data()), SmemLayoutA{});          // (BLK_M,BLK_K,PIPE)
     Tensor sB = make_tensor(make_smem_ptr(shared_tensors.smem_B.data()), SmemLayoutB{});          // (BLK_N,BLK_K,PIPE)
+    
+    // Block scaling
+    Tensor sScaleA = make_tensor(cute::make_smem_ptr(shared_tensors.smem_scale_A.data()), SmemLayoutScaleA{}); // (k)
+    Tensor sScaleB = make_tensor(cute::make_smem_ptr(shared_tensors.smem_scale_B.data()), SmemLayoutScaleB{}); // (k)
 
     //
     // Define C accumulators and A/B partitioning
@@ -596,13 +601,17 @@ struct CollectiveMma<
 
     // We release buffers to producer warps(dma load) with some mmas in flight
     PipelineState smem_pipe_release = smem_pipe_read;
+    
+    // Per block scale values for operand A and B
+    ElementBlockScale scale_a;
+    ElementBlockScale scale_b;
 
     // Prologue GMMAs
     int prologue_mma_count = min(K_PIPE_MMAS, k_tile_count);
 
     tiled_mma.accumulate_ = GMMA::ScaleOut::Zero;
 
-    GmmaFP8Accumulation accumulation(accum, mainloop_params.mma_promotion_interval, size<2>(tCrA));
+    GmmaFP8AccumulationBlockScaling accumulation(accum, mainloop_params.mma_promotion_interval, size<2>(tCrA));
     warpgroup_fence_operand(accumulation());
     CUTLASS_PRAGMA_UNROLL
     for (int k_tile_prologue = prologue_mma_count; k_tile_prologue > 0; --k_tile_prologue)
@@ -626,9 +635,29 @@ struct CollectiveMma<
       }
       warpgroup_commit_batch();
 
-      accumulation.promote_if_needed();
+      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
+                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
+        printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(sScaleA[read_stage]));
+        printf("k_tile_prologue = %d\n", k_tile_prologue);
+      }
+      
+      // Load per block scale values from shared memory to registers (once per block) 
+      scale_a = sScaleA[read_stage];
+      scale_b = sScaleB[read_stage];
+      
+      accumulation.promote_if_needed(scale_a, scale_b);
 
       ++smem_pipe_read;
+    }
+
+    if (false && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
+                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
+      printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
+      printf("sScaleA.layout(): "); print(sScaleA.layout()); printf("\n");
+      printf("sScaleB.layout(): "); print(sScaleB.layout()); printf("\n");
+      printf("mainloop_params.mma_promotion_interval = %d\n", mainloop_params.mma_promotion_interval);
+      printf("size<2>(tCrA)/mma_count_per_mainloop_iteration = %d\n", int(size<2>(tCrA)));
     }
 
     warpgroup_fence_operand(accumulation());
@@ -667,7 +696,18 @@ struct CollectiveMma<
       warpgroup_wait<K_PIPE_MMAS>();
       warpgroup_fence_operand(accumulation());
 
-      accumulation.promote_if_needed();
+      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
+                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
+        printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(sScaleA[read_stage]));
+        printf("k_tile_count = %d\n", k_tile_count);
+      }
+
+      // Load per block scale values from shared memory to registers (once per block) 
+      scale_a = sScaleA[read_stage];
+      scale_b = sScaleB[read_stage];
+
+      accumulation.promote_if_needed(scale_a, scale_b);
 
       pipeline.consumer_release(smem_pipe_release);                 // UNLOCK smem_pipe_release, done _computing_ on it
 
@@ -675,8 +715,9 @@ struct CollectiveMma<
       ++smem_pipe_read;
       ++smem_pipe_release;
     }
-
-    accumulation.promote_residue_if_needed();
+    
+    // TODO: We are not scaling the residue.
+    // accumulation.promote_residue_if_needed();
 
     warpgroup_fence_operand(accumulation());
   }

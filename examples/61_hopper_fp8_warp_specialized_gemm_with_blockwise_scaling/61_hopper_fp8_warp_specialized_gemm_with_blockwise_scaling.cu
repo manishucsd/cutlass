@@ -338,8 +338,8 @@ void initialize(const Options<RasterOrderOptions> &options) {
   cutlass::Distribution::Kind dist_A = cutlass::Distribution::Uniform;
   cutlass::Distribution::Kind dist_B = cutlass::Distribution::Uniform;
   cutlass::Distribution::Kind dist_C = cutlass::Distribution::Uniform;
-  cutlass::Distribution::Kind dist_scaleA = cutlass::Distribution::Sequential;
-  cutlass::Distribution::Kind dist_scaleB = cutlass::Distribution::Sequential;
+  cutlass::Distribution::Kind dist_scaleA = cutlass::Distribution::Uniform;
+  cutlass::Distribution::Kind dist_scaleB = cutlass::Distribution::Uniform;
 
   initialize_tensor(tensor_A.host_view(), dist_A, seed + 2022);
   initialize_tensor(tensor_B.host_view(), dist_B, seed + 2023);
@@ -347,9 +347,9 @@ void initialize(const Options<RasterOrderOptions> &options) {
   initialize_tensor(blockscale_tensor_A.host_view(), dist_scaleA, seed + 2025);
   initialize_tensor(blockscale_tensor_B.host_view(), dist_scaleB, seed + 2026);
 
-  std::cout << "blockscale_tensor_A" << blockscale_a_coord << std::endl;
+  std::cout << "blockscale_tensor_A: " << blockscale_a_coord << std::endl;
   std::cout << blockscale_tensor_A.host_view() << "\n";
-  std::cout << "blockscale_tensor_B" << blockscale_b_coord << std::endl;
+  std::cout << "blockscale_tensor_B: " << blockscale_b_coord << std::endl;
   std::cout << blockscale_tensor_B.host_view() << "\n";
 
   // Print block scaling tensors on the host side.
