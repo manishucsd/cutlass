@@ -457,8 +457,8 @@ struct CollectiveMma<
         }
       }
 
-      bool is_print_load =  (m_coord == 0 && n_coord == 1) &&
-                        (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) && false;
+      bool is_print_load =  (m_coord == 0 && n_coord == 0) &&
+                            (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) && false;
       if (is_print_load) {
         printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (load)\n");
         printf("m_coord=%d, n_coord=%d, blockIdx.x=%d, blockIdx.y=%d, blockIdx.z=%d\n", 

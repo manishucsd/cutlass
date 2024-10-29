@@ -336,28 +336,6 @@ struct CollectiveMma<
       auto [m_coord, n_coord, k_coord, l_coord] = blk_coord;
       Tensor gA = gA_mkl(_,_,m_coord,_,l_coord);                                                     // (BLK_M,BLK_K,k)
       Tensor gB = gB_nkl(_,_,n_coord,_,l_coord);                                                     // (BLK_N,BLK_K,k)
-      
-      if (false && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-          threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-        printf("MainloopSm90TmaGmmaWarpSpecializedFP8::load()\n");
-        printf("blk_coord: "); print(blk_coord); printf("\n");
-        printf("gA_mkl: "); cute::print(cute::layout(gA_mkl)); printf("\n");
-        printf("gA: "); cute::print(cute::layout(gA)); printf("\n");
-        printf("sA: "); cute::print(cute::layout(sA)); printf("\n");
-
-        printf("gB_nkl: "); cute::print(cute::layout(gB_nkl)); printf("\n");
-        printf("gB: "); cute::print(cute::layout(gB)); printf("\n");
-        printf("sB: "); cute::print(cute::layout(sB)); printf("\n"); 
-
-
-        /*
-        How to read this?
-          blk_coord: (0,0,_,0)
-          gA_mkl: (_128,_128,8,8,1):(_1@1,_1@0,_128@1,_128@0,_1@2) 1024x1024x1
-          gA: (_128,_128,8):(_1@1,_1@0,_128@0) 1
-          sA: (_128,_128,_6):(_128,_1,_16384)
-        */
-      }
 
       // Applies the mapping from block_tma_a
       Tensor tAgA = block_tma_a.partition_S(gA);                                                 // (TMA,TMA_M,TMA_K,k)
