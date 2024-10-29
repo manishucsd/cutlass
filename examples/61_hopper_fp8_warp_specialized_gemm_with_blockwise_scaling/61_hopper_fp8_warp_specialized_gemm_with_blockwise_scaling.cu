@@ -512,24 +512,44 @@ bool verify(const Options<RasterOrderOptions> &options) {
   // Compute reference output
   //
 
-  // Create instantiation for device reference gemm kernel
-  auto A = cute::make_tensor(tensor_A.host_data(),
-      cute::make_layout(cute::make_shape(options.m, options.k, options.l), stride_A));
-  auto B = cute::make_tensor(tensor_B.host_data(),
-      cute::make_layout(cute::make_shape(options.n, options.k, options.l), stride_B));
-  auto C = cute::make_tensor(tensor_C.host_data(),
-      cute::make_layout(cute::make_shape(options.m, options.n, options.l), stride_C));
-  auto D = cute::make_tensor(tensor_ref_D.host_data(),
-      cute::make_layout(cute::make_shape(options.m, options.n, options.l), stride_D));
-  auto Aux = cute::make_tensor(tensor_ref_aux.host_data(),
-      cute::make_layout(cute::make_shape(options.m, options.n, options.l), stride_aux));
-
-  // Block scaling tensors
+  // Block scaling tensors shapes based CTA Block (TileShape) and GEMM Problem shape
   auto gemm_problem_shape = cute::make_shape(options.m, options.n, options.k);
   auto blockscale_shape = shape(get<1>(cute::zipped_divide(cute::make_layout(gemm_problem_shape), TileShape{})));
   auto blockscale_m = cute::get<0>(blockscale_shape);
   auto blockscale_n = cute::get<1>(blockscale_shape);
   auto blockscale_k = cute::get<2>(blockscale_shape);
+
+  // Create instantiation for device reference gemm kernel
+  auto A = cute::make_tensor(tensor_A.host_data(),
+                             cute::make_layout(
+                                cute::make_shape(options.m, options.k, options.l),
+                                stride_A
+                              )
+                            );
+  auto B = cute::make_tensor(tensor_B.host_data(),
+                             cute::make_layout(
+                               cute::make_shape(options.n, options.k, options.l),
+                               stride_B
+                              )
+                            );
+  auto C = cute::make_tensor(tensor_C.host_data(),
+                             cute::make_layout(
+                                cute::make_shape(options.m, options.n, options.l),
+                                stride_C
+                              )
+                            );
+  auto D = cute::make_tensor(tensor_ref_D.host_data(),
+                             cute::make_layout(
+                                cute::make_shape(options.m, options.n, options.l),
+                                stride_D
+                              )
+                            );
+  auto Aux = cute::make_tensor(tensor_ref_aux.host_data(),
+                               cute::make_layout(
+                                  cute::make_shape(options.m, options.n, options.l),
+                                  stride_aux
+                                )
+                              );
 
   auto blockscale_A = cute::make_tensor(blockscale_tensor_A.host_data(),
                                         cute::make_layout(
@@ -548,7 +568,11 @@ bool verify(const Options<RasterOrderOptions> &options) {
 
   cutlass::reference::host::GettMainloopParams<ElementAccumulator,
                                                decltype(A), decltype(B),
-                                               decltype(blockscale_A), decltype(blockscale_B)> mainloop_params{A, B, blockscale_A, blockscale_B};
+                                               decltype(blockscale_A), decltype(blockscale_B),
+                                               TileShape> mainloop_params{
+                                               A, B,                         // Operand Tensors
+                                               blockscale_A, blockscale_B    // Blockwise scaling Tensors
+                                              };
 
   cutlass::reference::host::GettEpilogueParams<
       ElementScalar,

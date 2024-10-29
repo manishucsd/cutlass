@@ -64,7 +64,8 @@ template<
   class TensorA_,                                                                                         // (M, K, L)
   class TensorB_,                                                                                         // (N, K, L)
   class TensorScaleA_,                                                                                    // (m, k, L)
-  class TensorScaleB_                                                                                     // (n, k, L)
+  class TensorScaleB_,                                                                                    // (n, k, L)
+  class TileShape_
 >
 struct GettMainloopParams {
   using ElementAccumulator = ElementAccumulator_;
@@ -77,16 +78,14 @@ struct GettMainloopParams {
 
   using TensorScaleA = TensorScaleA_;
   using TensorScaleB = TensorScaleB_;
+  using TileShape = TileShape_;
   using EngineScaleA = typename TensorScaleA::engine_type;
   using EngineScaleB = typename TensorScaleB::engine_type;
 
   TensorA A{};
   TensorB B{};
   TensorScaleA ScaleA{};
-  TensorScaleB ScaleB{};
-  ComplexTransform transform_A = ComplexTransform::kNone;
-  ComplexTransform transform_B = ComplexTransform::kNone;
-  
+  TensorScaleB ScaleB{};  
 };
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
@@ -149,7 +148,7 @@ struct GettEpilogueParams {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-/// GETT - General Tensor-Tensor contraction reference kernel
+/// GETT - General Tensor-Tensor contraction reference kernel with Blockwise scaling
 template <
   class MainloopParams,
   class EpilogueParams
@@ -159,8 +158,8 @@ void Gett(
     EpilogueParams const& epilogue_params)
 {
 
-  static int constexpr kBlockM = 128;
-  static int constexpr kBlockN = 128;
+  static int constexpr kBlockM = cute::get<0>(typename MainloopParams::TileShape{});
+  static int constexpr kBlockN = cute::get<1>(typename MainloopParams::TileShape{});
   // printf("mainloop_params.ScaleA.layout()"); cute::print(mainloop_params.ScaleA.layout()); printf("\n");
   // printf("mainloop_params.ScaleB.layout()"); cute::print(mainloop_params.ScaleB.layout()); printf("\n");
 
@@ -205,7 +204,7 @@ void gett_mainloop(
 
   multiplies<ElementAccumulator> scale_op;
 
-  static int constexpr kBlockK = 128;
+  static int constexpr kBlockK = cute::get<2>(typename MainloopParams::TileShape{});;
 
   // Tempo accumulators to seperate blockwise accumulation
   typename MainloopParams::ElementAccumulator acc_temp[kBlockM][kBlockN];
@@ -226,9 +225,8 @@ void gett_mainloop(
   // Compute on this k-block
   for (int64_t k = 0; k < cute::size<1>(mainloop_params.A.layout()); ++k) {
 
+    // Load Blockwise scaling factor from blockscale Tensors for A and B
     int64_t block_k = k / kBlockK;
-
-    // Load BlockScaling factor for A and B operands
     ElementBlockScaleA scale_a = blockscale_A[block_k];
     ElementBlockScaleB scale_b = blockscale_B[block_k];
 
@@ -238,10 +236,6 @@ void gett_mainloop(
       if (m + m_b < cute::size<0>(mainloop_params.A.layout())) {
         // Perform reference GEMM calculations at the accumulator's precision. Cast A value to accumulator type.
         a_frag[m_b] = static_cast<ElementAccumulator>(ElementA(mainloop_params.A(m + m_b, k, l)));
-        
-        if (mainloop_params.transform_A == ComplexTransform::kConjugate) {
-          a_frag[m_b] = conj(a_frag[m_b]);
-        }
       } else {
         a_frag[m_b] = ElementAccumulator(0); // RingOp::AdditionIdentity
       }
@@ -253,10 +247,6 @@ void gett_mainloop(
       if (n + n_b < cute::size<0>(mainloop_params.B.layout())) {
         // Perform reference GEMM calculations at the accumulator's precision. Cast A value to accumulator type.
         b_frag[n_b] = static_cast<ElementAccumulator>(ElementB(mainloop_params.B(n + n_b, k, l)));
-
-        if (mainloop_params.transform_B == ComplexTransform::kConjugate) {
-          b_frag[n_b] = conj(b_frag[n_b]);
-        }
       } else {
         b_frag[n_b] = ElementAccumulator(0); // RingOp::AdditionIdentity
       }
@@ -269,7 +259,7 @@ void gett_mainloop(
       }
     }
 
-    // Blockwise-scaling 
+    // Apply Blockwise-scaling at kBlockK boundary
     // (a) Apply block scaling factors on the partial accumulated results (acc_temp) at the kBlocK boundary 
     // (b) Zero-out partial temporary (acc_temp),
     // (c) Update permanent (accu)
@@ -487,14 +477,6 @@ void gett_epilogue(
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-template <class TensorType>
-auto make_layout_rank3(const TensorType& tensor) {
-  // append a batch mode of size 1 if we do not have tensors that are rank 3
-  return make_layout(
-      make_shape(cute::get<0>(tensor.shape()), cute::get<1>(tensor.shape()), cute::Int<1>{}),
-      make_stride(cute::get<0>(tensor.stride()), cute::get<1>(tensor.stride()), int64_t(cosize(tensor.layout()))));
-}
-
 /// GEMM - General Matrix-Matrix contraction without conjugation options
 template <
   class MainloopParams,
@@ -509,8 +491,9 @@ void Gemm3x(
   static_assert(cute::rank(typename MainloopParams::LayoutA{}) == cute::rank(typename MainloopParams::LayoutB{}));
   static_assert(cute::rank(typename EpilogueParams::LayoutC{}) == cute::rank(typename EpilogueParams::LayoutD{}));
   static_assert(cute::rank(typename MainloopParams::LayoutA{}) == cute::rank(typename EpilogueParams::LayoutC{}));
-
-  // if we already have a batch mode, just pass it through
+  static_assert(cute::rank(typename MainloopParams::LayoutA{}) == 3, "Only Rank3 Tensors (M, K, Batch_Count) "
+                                                                     "with Batchmode are supported");
+  // Lower the Matrix-Multiplication with Blockwise scaling (Gemm3x) to a Tensor Contraction (Gett).
   Gett(mainloop_params, epilogue_params);
 }
 
