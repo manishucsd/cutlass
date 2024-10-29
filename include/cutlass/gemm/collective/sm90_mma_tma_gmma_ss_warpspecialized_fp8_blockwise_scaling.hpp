@@ -465,9 +465,10 @@ struct CollectiveMma<
       }
 
 
-      bool print_for =  (m_coord == 1 && n_coord == 1) &&
+      bool print_for =  (m_coord == 0 && n_coord == 1) &&
                         (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) && false;
       if (print_for) {
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (load)\n");
         printf("m_coord=%d, n_coord=%d, blockIdx.x=%d, blockIdx.y=%d, blockIdx.z=%d\n", 
                 m_coord, n_coord, blockIdx.x, blockIdx.y, blockIdx.z); 
       }
@@ -542,6 +543,9 @@ struct CollectiveMma<
       int thread_idx,
       TensorStorage& shared_tensors,
       Params const& mainloop_params) {
+    
+    bool mma_print_for =  blockIdx.z == 0 && blockIdx.y == 1 && blockIdx.x == 0 && 
+                            threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && false;
 
     static_assert(is_rmem<FrgTensorC>::value, "C tensor must be rmem resident.");
     static_assert(cute::rank(SmemLayoutA{}) == 3, "Smem layout must be rank 3.");
@@ -635,24 +639,25 @@ struct CollectiveMma<
       }
       warpgroup_commit_batch();
 
-      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
-        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
-        printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(sScaleA[read_stage]));
-        printf("k_tile_prologue = %d\n", k_tile_prologue);
-      }
       
-      // Load per block scale values from shared memory to registers (once per block) 
+      // Load per block scale values from shared memory to registers.
       scale_a = sScaleA[read_stage];
       scale_b = sScaleB[read_stage];
-      
+
+      if (mma_print_for) {
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
+        printf("blockIdx.x=%d, blockIdx.y=%d, blockIdx.z=%d\n", blockIdx.x, blockIdx.y, blockIdx.z); 
+        printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(scale_a));
+        printf("sScaleB[read_stage=%d] = %d\n", read_stage, int(scale_b));
+        printf("k_tile_prologue = %d\n", k_tile_prologue);
+      }
+
       accumulation.promote_if_needed(scale_a, scale_b);
 
       ++smem_pipe_read;
     }
 
-    if (false && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
+    if (mma_print_for && false) {
       printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
       printf("sScaleA.layout(): "); print(sScaleA.layout()); printf("\n");
       printf("sScaleB.layout(): "); print(sScaleB.layout()); printf("\n");
@@ -696,16 +701,16 @@ struct CollectiveMma<
       warpgroup_wait<K_PIPE_MMAS>();
       warpgroup_fence_operand(accumulation());
 
-      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
-        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
-        printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(sScaleA[read_stage]));
-        printf("k_tile_count = %d\n", k_tile_count);
-      }
-
       // Load per block scale values from shared memory to registers (once per block) 
       scale_a = sScaleA[read_stage];
       scale_b = sScaleB[read_stage];
+
+      if (mma_print_for) {
+        printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
+        printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(scale_a));
+        printf("sScaleB[read_stage=%d] = %d\n", read_stage, int(scale_b));
+        printf("k_tile_count = %d\n", k_tile_count);
+      }
 
       accumulation.promote_if_needed(scale_a, scale_b);
 

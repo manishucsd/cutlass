@@ -71,16 +71,16 @@ private:
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < size(accum_); ++i) {
 
-      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-                  threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 2 && 
+                  threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && i == 0) {
         printf("Before Scaling: accum_(i=%d) = %d, accum_temp_(i) = %d, scale_a = %d, scale_b = %d\n", 
               i, int(accum_(i)), int(accum_temp_(i)), int(scale_a), int(scale_b));
       }
 
       accum_(i) = __fmaf_rn(accum_temp_(i), scale_a * scale_b, accum_(i));
 
-      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0) {
+      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 2 && 
+                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && i == 0) {
         printf("After Scaling: accum_(i=%d) = %d\n", i, int(accum_(i)));
       }
     }

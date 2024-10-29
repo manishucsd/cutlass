@@ -337,9 +337,8 @@ struct CollectiveMma<
       Tensor gA = gA_mkl(_,_,m_coord,_,l_coord);                                                     // (BLK_M,BLK_K,k)
       Tensor gB = gB_nkl(_,_,n_coord,_,l_coord);                                                     // (BLK_N,BLK_K,k)
       
-      if (blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
+      if (false && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
           threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-      // if (false) {
         printf("MainloopSm90TmaGmmaWarpSpecializedFP8::load()\n");
         printf("blk_coord: "); print(blk_coord); printf("\n");
         printf("gA_mkl: "); cute::print(cute::layout(gA_mkl)); printf("\n");
