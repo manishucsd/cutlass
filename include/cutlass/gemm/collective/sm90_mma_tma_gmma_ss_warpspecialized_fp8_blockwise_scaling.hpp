@@ -406,13 +406,6 @@ struct CollectiveMma<
       Tensor tBgB_ScaleB = thr_scale_copy.partition_S(gScaleB);
       Tensor tBsB_ScaleB = thr_scale_copy.partition_D(sScaleB);
 
-#if 0
-      Tensor gScaleA_mkl = local_tile(gScaleA_mkl_in, TileShape{}, make_coord(_,_,_), Step<_1, X,_1>{});        // (1,1,m,k,l)
-      Tensor gScaleB_mkl = local_tile(gScaleB_nkl_in, TileShape{}, make_coord(_,_,_), Step< X,_1,_1>{});        // (1,1,n,k,l)
-      Tensor gScaleA = gScaleA_mkl(_,_,m_coord,_,l_coord);                                                      // (1,BLK_K,1)
-      Tensor gScaleB = gScaleB_mkl(_,_,n_coord,_,l_coord);                                                      // (1,BLK_K,1)
-#endif
-
 
       // Applies the mapping from block_tma_a
       Tensor tAgA = block_tma_a.partition_S(gA);                                              // (TMA,TMA_M,TMA_K,k)
@@ -464,10 +457,9 @@ struct CollectiveMma<
         }
       }
 
-
-      bool print_for =  (m_coord == 0 && n_coord == 1) &&
+      bool is_print_load =  (m_coord == 0 && n_coord == 1) &&
                         (threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) && false;
-      if (print_for) {
+      if (is_print_load) {
         printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (load)\n");
         printf("m_coord=%d, n_coord=%d, blockIdx.x=%d, blockIdx.y=%d, blockIdx.z=%d\n", 
                 m_coord, n_coord, blockIdx.x, blockIdx.y, blockIdx.z); 
@@ -490,18 +482,18 @@ struct CollectiveMma<
         copy(mainloop_params.tma_load_a.with(*tma_barrier, mcast_mask_a), tAgA(_,_,_,*k_tile_iter), tAsA(_,_,_,write_stage));
         copy(mainloop_params.tma_load_b.with(*tma_barrier, mcast_mask_b), tBgB(_,_,_,*k_tile_iter), tBsB(_,_,_,write_stage));
 
-#if 1 // copy scaling factors to smem
+
         copy(scale_copy, tAgA_ScaleA(_,*k_tile_iter), tAsA_ScaleA(_,write_stage));
         copy(scale_copy, tBgB_ScaleB(_,*k_tile_iter), tBsB_ScaleB(_,write_stage));
         cp_async_fence();
         cp_async_wait<0>();
-        if (print_for) {
+        if (is_print_load) {
           printf("gmem (*k_tile_iter=%d) shared_tensors.smem_scale_A[write_stage=%d] = %d\n", 
                    *k_tile_iter, write_stage, int(shared_tensors.smem_scale_A[write_stage]));
           printf("gmem (*k_tile_iter=%d) shared_tensors.smem_scale_B[write_stage=%d] = %d\n", 
                    *k_tile_iter, write_stage, int(shared_tensors.smem_scale_B[write_stage]));
         }
-#endif
+
 
         ++k_tile_iter;
 
@@ -544,8 +536,8 @@ struct CollectiveMma<
       TensorStorage& shared_tensors,
       Params const& mainloop_params) {
     
-    bool mma_print_for =  blockIdx.z == 0 && blockIdx.y == 1 && blockIdx.x == 0 && 
-                            threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && false;
+    bool is_print_mma =  blockIdx.z == 0 && blockIdx.y == 1 && blockIdx.x == 0 && 
+                          threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && false;
 
     static_assert(is_rmem<FrgTensorC>::value, "C tensor must be rmem resident.");
     static_assert(cute::rank(SmemLayoutA{}) == 3, "Smem layout must be rank 3.");
@@ -644,7 +636,7 @@ struct CollectiveMma<
       scale_a = sScaleA[read_stage];
       scale_b = sScaleB[read_stage];
 
-      if (mma_print_for) {
+      if (is_print_mma) {
         printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
         printf("blockIdx.x=%d, blockIdx.y=%d, blockIdx.z=%d\n", blockIdx.x, blockIdx.y, blockIdx.z); 
         printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(scale_a));
@@ -657,7 +649,7 @@ struct CollectiveMma<
       ++smem_pipe_read;
     }
 
-    if (mma_print_for && false) {
+    if (is_print_mma) {
       printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
       printf("sScaleA.layout(): "); print(sScaleA.layout()); printf("\n");
       printf("sScaleB.layout(): "); print(sScaleB.layout()); printf("\n");
@@ -705,7 +697,7 @@ struct CollectiveMma<
       scale_a = sScaleA[read_stage];
       scale_b = sScaleB[read_stage];
 
-      if (mma_print_for) {
+      if (is_print_mma) {
         printf("MainloopSm90TmaGmmaWarpSpecializedFP8BlockWiseScaling (mma)\n");
         printf("sScaleA[read_stage=%d] = %d\n", read_stage, int(scale_a));
         printf("sScaleB[read_stage=%d] = %d\n", read_stage, int(scale_b));

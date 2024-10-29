@@ -80,12 +80,11 @@
 #include "cutlass/util/reference/host/tensor_copy.h"
 #include "cutlass/util/reference/host/tensor_compare.h"
 #include "cutlass/util/reference/host/tensor_norm.h"
-// #include "cutlass/util/reference/host/gett.hpp"
-#include "reference/gemm_with_blockscaling.h"
 
-
+// Includes from examples directory
 #include "helper.h"
 #include "hopper_fp8_commandline.hpp"
+#include "reference/host/gemm_with_blockwise_scaling.h"
 
 using namespace cute;
 
@@ -107,7 +106,6 @@ constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // M
 
 // C matrix configuration
 using         ElementC    = cutlass::float_e4m3_t;                          // Element type for C and D matrix operands
-// using         ElementC    = float;                          // Element type for C and D matrix operands
 using         LayoutC     = cutlass::layout::ColumnMajor;                   // Layout type for C and D matrix operands
 constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
@@ -124,7 +122,7 @@ using         ElementBias  = float;
 
 // Core kernel configurations
 using ElementAccumulator  = float;                                          // Element type for internal accumulation
-using ElementBlockScale = float;                                            // Element type for blockscaling during accumulation
+using ElementBlockScale   = float;                                          // Element type for blockscaling during accumulation
 using ElementCompute      = float;                                          // Element type for epilogue computation
 using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
 using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
@@ -315,7 +313,7 @@ struct Result
 
       double scope_max, scope_min;
 
-      scope_min = 0;
+      scope_min = -1;
       scope_max = 1;
 
       cutlass::reference::host::TensorFillRandomUniform(
@@ -386,10 +384,12 @@ void initialize(const Options<RasterOrderOptions> &options) {
   initialize_scale_tensor(blockscale_tensor_A.host_view(), dist_scaleA, seed + 2025);
   initialize_scale_tensor(blockscale_tensor_B.host_view(), dist_scaleB, seed + 2026);
 
+#if 0 // Dump blockscaled tensors
   std::cout << "blockscale_tensor_A: " << blockscale_a_coord << std::endl;
   std::cout << blockscale_tensor_A.host_view() << "\n";
   std::cout << "blockscale_tensor_B: " << blockscale_b_coord << std::endl;
   std::cout << blockscale_tensor_B.host_view() << "\n";
+#endif
 
   // Print block scaling tensors on the host side.
   tensor_A.sync_device();

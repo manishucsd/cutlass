@@ -161,8 +161,8 @@ void Gett(
 
   static int constexpr kBlockM = 128;
   static int constexpr kBlockN = 128;
-  printf("mainloop_params.ScaleA.layout()"); cute::print(mainloop_params.ScaleA.layout()); printf("\n");
-  printf("mainloop_params.ScaleB.layout()"); cute::print(mainloop_params.ScaleB.layout()); printf("\n");
+  // printf("mainloop_params.ScaleA.layout()"); cute::print(mainloop_params.ScaleA.layout()); printf("\n");
+  // printf("mainloop_params.ScaleB.layout()"); cute::print(mainloop_params.ScaleB.layout()); printf("\n");
 
 #if defined(_OPENMP)
   #pragma omp parallel for collapse(3)
@@ -222,32 +222,15 @@ void gett_mainloop(
   int64_t block_n = n / kBlockN;
   cute::Tensor blockscale_A = mainloop_params.ScaleA(block_m, _, l);
   cute::Tensor blockscale_B = mainloop_params.ScaleB(block_n, _, l);
-  std::cout << "block (m, n): (" << block_m << ", " << block_n << ")" << std::endl;
-  
-  for (int64_t blk_k = 0; blk_k < cute::size<1>(mainloop_params.ScaleA.layout()); blk_k++) {
-    std::cout << "blk_k: "<< blk_k << ", blockscale_A[blk_k]: " << blockscale_A[blk_k] << std::endl;
-  }
-
-  for (int64_t blk_k = 0; blk_k < cute::size<1>(mainloop_params.ScaleB.layout()); blk_k++) {
-    std::cout << "blk_k: "<< blk_k << ", blockscale_B[blk_k]: " << blockscale_B[blk_k] << std::endl;
-  }
-  //printf("blockscale_A.layout(): "); cute::print(blockscale_A.layout()); print("\n");
-  //printf("blockscale_B.layout(): "); cute::print(blockscale_B.layout()); print("\n");
-
-
 
   // Compute on this k-block
   for (int64_t k = 0; k < cute::size<1>(mainloop_params.A.layout()); ++k) {
 
     int64_t block_k = k / kBlockK;
 
-    // Load BlockScaling factor for A
+    // Load BlockScaling factor for A and B operands
     ElementBlockScaleA scale_a = blockscale_A[block_k];
     ElementBlockScaleB scale_b = blockscale_B[block_k];
-    //std::cout << "block (m, n, k): (" << block_m << ", " << block_n << ", " << block_k << ")" << std::endl;
-    //std::cout << "scale_a: " << scale_a << std::endl;
-    //std::cout << "scale_b: " << scale_b << std::endl;
-
 
     // Load A
     ElementAccumulator a_frag[kBlockM];
@@ -286,22 +269,16 @@ void gett_mainloop(
       }
     }
 
-    // Apply Blockscaling on the accumulated results at the kBlocK boundary.
+    // Blockwise-scaling 
+    // (a) Apply block scaling factors on the partial accumulated results (acc_temp) at the kBlocK boundary 
+    // (b) Zero-out partial temporary (acc_temp),
+    // (c) Update permanent (accu)
     if ((k+1) % kBlockK == 0) {
       for (int m_b = 0; m_b < kBlockM; ++m_b) {
         for (int n_b = 0; n_b < kBlockN; ++n_b) {
-          if (m_b == 0 && n_b == 0 && block_m == 2 && block_n == 0) {
-            std::cout << "accum before scaling: " << acc[m_b][n_b] << std::endl;
-            std::cout << "scale_a: " << scale_a << std::endl;
-            std::cout << "scale_b: " << scale_b << std::endl;
-          }
           ElementAccumulator blockwise_scaled_accum = acc_temp[m_b][n_b] * scale_a * scale_b;
           acc[m_b][n_b] = blockwise_scaled_accum + acc[m_b][n_b];
           acc_temp[m_b][n_b] = ElementAccumulator(0); 
-          
-          if (m_b == 0 && n_b == 0 && block_m == 2 && block_n == 0) {
-            std::cout << "accum after scaling: " << acc[m_b][n_b] << std::endl;
-          }
         }
       }
     }
