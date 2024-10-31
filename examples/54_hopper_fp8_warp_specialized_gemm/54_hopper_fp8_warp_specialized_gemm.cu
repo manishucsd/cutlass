@@ -100,13 +100,13 @@ using         LayoutA     = cutlass::layout::RowMajor;                      // L
 constexpr int AlignmentA  = 128 / cutlass::sizeof_bits<ElementA>::value;    // Memory access granularity/alignment of A matrix in units of elements (up to 16 bytes)
 
 // B matrix configuration
-using         ElementB    = cutlass::float_e5m2_t;                          // Element type for B matrix operand
+using         ElementB    = cutlass::float_e4m3_t;                          // Element type for B matrix operand
 using         LayoutB     = cutlass::layout::ColumnMajor;                   // Layout type for B matrix operand
 constexpr int AlignmentB  = 128 / cutlass::sizeof_bits<ElementB>::value;    // Memory access granularity/alignment of B matrix in units of elements (up to 16 bytes)
 
 // C matrix configuration
-// using         ElementC    = cutlass::float_e4m3_t;                          // Element type for C and D matrix operands
-using         ElementC    = float;                          // Element type for C and D matrix operands
+using         ElementC    = cutlass::float_e4m3_t;                          // Element type for C and D matrix operands
+// using         ElementC    = float;                          // Element type for C and D matrix operands
 using         LayoutC     = cutlass::layout::ColumnMajor;                   // Layout type for C and D matrix operands
 constexpr int AlignmentC  = 128 / cutlass::sizeof_bits<ElementC>::value;    // Memory access granularity/alignment of C matrix in units of elements (up to 16 bytes)
 
@@ -128,8 +128,8 @@ using ArchTag             = cutlass::arch::Sm90;                            // T
 using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
 using TileShape           = Shape<_128,_128,_128>;                           // Threadblock-level tile size
 using ClusterShape        = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
-using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecialized;
-using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecialized;
+using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;
+using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
 using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
 using FusionOperation     = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
     LayoutAux, cutlass::epilogue::thread::ReLU, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>;

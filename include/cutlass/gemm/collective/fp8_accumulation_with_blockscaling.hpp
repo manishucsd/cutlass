@@ -63,26 +63,14 @@ private:
   uint32_t mma_count_;                        // current executed MMAs
   uint32_t reset_accum_flag_;                 // accum needs to be zeroed or not. 
 
-  template <class ElementBlockScaleA, class ElementBlockScaleB>
+  template <class ElementBlockScale>
   CUTLASS_DEVICE
-  void promote_core(ElementBlockScaleA scale_a,
-                    ElementBlockScaleB scale_b) {
+  void promote_core(ElementBlockScale const& scale) {
     warpgroup_wait<0>();
     CUTLASS_PRAGMA_UNROLL
     for (int i = 0; i < size(accum_); ++i) {
-
-      if (false && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 2 && 
-                  threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && i == 0) {
-        printf("Before Scaling: accum_(i=%d) = %d, accum_temp_(i) = %d, scale_a = %d, scale_b = %d\n", 
-              i, int(accum_(i)), int(accum_temp_(i)), int(scale_a), int(scale_b));
-      }
-
-      accum_(i) = __fmaf_rn(accum_temp_(i), scale_a * scale_b, accum_(i));
-
-      if (false && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 2 && 
-                threadIdx.x == 128 && threadIdx.y == 0 && threadIdx.z == 0 && i == 0) {
-        printf("After Scaling: accum_(i=%d) = %d\n", i, int(accum_(i)));
-      }
+      accum_(i) += accum_temp_(i) * scale;
+      // accum_(i) = __fmaf_rn(accum_temp_(i), scale, accum_(i));
     }
   }
 
@@ -113,14 +101,13 @@ public:
   }
 
   /// promote (add) the results from the MMA accumulators to main accumulator if needed.
-  template <class ElementBlockScaleA, class ElementBlockScaleB>
+  template <class ElementBlockScale>
   CUTLASS_DEVICE
-  void promote_if_needed(ElementBlockScaleA scale_a,
-                         ElementBlockScaleB scale_b) {
+  void promote_if_needed(ElementBlockScale const& scale) {
     mma_count_ += mma_count_per_mainloop_iteration_;
     reset_accum_flag_ = __shfl_sync(0xffffffff, mma_count_ == accum_promotion_interval_, 0);
     if (reset_accum_flag_) {
-      promote_core(scale_a, scale_b);
+      promote_core(scale);
       mma_count_ = 0;
     }
   }
