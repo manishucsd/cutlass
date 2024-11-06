@@ -50,8 +50,8 @@ namespace gemm {
 
 /// Scaling kind
 enum class ScalingKind {
-  kTensorwise,   // Tensor is scaled by alpha and beta (default)
-  kBlockwise
+  kTensorwise,   // Accumulated GEMM result is scaled per tensor (default alpha scaling)
+  kBlockwise     // Accumulated GEMM result is scaled per CTA tile (blockwise)
 };
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////

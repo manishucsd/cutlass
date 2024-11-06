@@ -115,6 +115,8 @@ struct CollectiveMma<
   using PipelineState = cutlass::PipelineState<DispatchPolicy::Stages>;
 
   using PipelineParams = typename MainloopPipeline::Params;
+  // ScalingKind for the accumulated results
+  static constexpr cutlass::gemm::ScalingKind AccumScalingKind = cutlass::gemm::ScalingKind::kTensorwise; 
 
   static_assert(cute::rank(SmemLayoutAtomA{}) == 2, "SmemLayoutAtom must be rank 2 (M/N, K)");
   static_assert((size<0>(TileShape{}) % size<0>(SmemLayoutAtomA{})) == 0, "SmemLayoutAtom must evenly divide tile shape.");

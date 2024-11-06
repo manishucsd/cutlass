@@ -107,6 +107,7 @@ public:
   static constexpr uint32_t NumMmaWarpGroups = CUTE_STATIC_V(size(TiledMma{})) / NumThreadsPerWarpGroup;
   static constexpr uint32_t MaxThreadsPerBlock = CUTE_STATIC_V(size(TiledMma{})) + (NumLoadWarpGroups * NumThreadsPerWarpGroup);
   static constexpr uint32_t MinBlocksPerMultiprocessor = 1;
+  static constexpr uint32_t NumProducerThreads = (CollectiveMainloop::AccumScalingKind == cutlass::gemm::ScalingKind::kBlockwise) ? 2 : 1;
 
   /// Register requirement for Load and Math WGs
   static constexpr uint32_t LoadRegisterRequirement = 40;
@@ -361,6 +362,7 @@ public:
     }
     mainloop_pipeline_params.is_leader = warp_group_thread_idx == 0;
     mainloop_pipeline_params.num_consumers = size(TiledMma{});
+    mainloop_pipeline_params.num_producers = NumProducerThreads;
     mainloop_pipeline_params.transaction_bytes = params.mainloop.tma_transaction_bytes;
     MainloopPipeline mainloop_pipeline(shared_storage.pipelines.mainloop, mainloop_pipeline_params, ClusterShape{});
 

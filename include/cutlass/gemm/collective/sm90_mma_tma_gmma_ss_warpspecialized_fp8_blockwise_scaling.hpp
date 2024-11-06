@@ -117,6 +117,8 @@ struct CollectiveMma<
   using MainloopPipeline = cutlass::PipelineTmaAsync<DispatchPolicy::Stages>;
   using PipelineState = cutlass::PipelineState<DispatchPolicy::Stages>;
 
+  // ScalingKind for the accumulated results
+  static constexpr cutlass::gemm::ScalingKind AccumScalingKind = cutlass::gemm::ScalingKind::kBlockwise; 
   using PipelineParams = typename MainloopPipeline::Params;
 
   static_assert(cute::rank(SmemLayoutAtomA{}) == 2, "SmemLayoutAtom must be rank 2 (M/N, K)");
@@ -139,7 +141,7 @@ struct CollectiveMma<
   
   // Block scaling gmem-to-smem copy atom 
   using SmemBlockScalingCopyAtom = Copy_Atom<SM80_CP_ASYNC_CACHEALWAYS<ElementBlockScale>, ElementBlockScale>;
-
+  
   // Block scaling smem layout
   using SmemLayoutScaleA = Layout<Shape<Int<DispatchPolicy::Stages>>, Stride<_1>>;
   using SmemLayoutScaleB = Layout<Shape<Int<DispatchPolicy::Stages>>, Stride<_1>>;
@@ -410,7 +412,6 @@ struct CollectiveMma<
       Tensor tBgB_ScaleB = thr_scale_copy.partition_S(gScaleB);
       Tensor tBsB_ScaleB = thr_scale_copy.partition_D(sScaleB);
 
-
       // Applies the mapping from block_tma_a
       Tensor tAgA = block_tma_a.partition_S(gA);                                              // (TMA,TMA_M,TMA_K,k)
       Tensor tAsA = block_tma_a.partition_D(sA);                                              // (TMA,TMA_M,TMA_K,PIPE)
@@ -483,18 +484,17 @@ struct CollectiveMma<
         // Copy gmem to smem for *k_tile_iter
         //
         int write_stage = smem_pipe_write.index();
-        
-        copy(scale_copy, tAgA_ScaleA(_,*k_tile_iter), tAsA_ScaleA(_,write_stage));
-        copy(scale_copy, tBgB_ScaleB(_,*k_tile_iter), tBsB_ScaleB(_,write_stage));
-        cp_async_fence();
-
         using BarrierType = typename MainloopPipeline::ProducerBarrierType;
         BarrierType* tma_barrier = pipeline.producer_get_barrier(smem_pipe_write);
 
+        // Copy operands A and B from global memory to shared memory
         copy(mainloop_params.tma_load_a.with(*tma_barrier, mcast_mask_a), tAgA(_,_,_,*k_tile_iter), tAsA(_,_,_,write_stage));
         copy(mainloop_params.tma_load_b.with(*tma_barrier, mcast_mask_b), tBgB(_,_,_,*k_tile_iter), tBsB(_,_,_,write_stage));
 
-        cp_async_wait<0>();
+        // Copy scale tensors from global memory to shared memory
+        copy(scale_copy, tAgA_ScaleA(_,*k_tile_iter), tAsA_ScaleA(_,write_stage));
+        copy(scale_copy, tBgB_ScaleB(_,*k_tile_iter), tBsB_ScaleB(_,write_stage));
+        pipeline.producer_commit(smem_pipe_write, cutlass::arch::cpasync_barrier_arrive);
 
 #if ENABLE_PRINT
         if (is_print_load) {
