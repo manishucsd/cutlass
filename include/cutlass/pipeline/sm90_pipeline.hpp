@@ -244,11 +244,6 @@ public :
     int warp_idx = canonical_warp_idx_sync();
     int lane_predicate = cute::elect_one_sync();
 
-      if (true && blockIdx.z == 0 && blockIdx.y == 0 && blockIdx.x == 0 && 
-                  threadIdx.x == 0 && threadIdx.y == 0 && threadIdx.z == 0) {
-        printf("params_.num_producers=%d\n", params_.num_producers);
-      }
-
     if (warp_idx == 0 && lane_predicate == 1) {
       // Barrier FULL init
       for (int i = 0; i < Stages; ++i) {
