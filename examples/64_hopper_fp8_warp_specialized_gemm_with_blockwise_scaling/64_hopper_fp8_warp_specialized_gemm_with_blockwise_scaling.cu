@@ -124,19 +124,24 @@ using         ElementAmax  = float;
 using         ElementBias  = float;
 
 // Core kernel configurations
-using ElementAccumulator  = float;                                          // Element type for internal accumulation
-using ElementBlockScale   = float;                                          // Element type for blockscaling during accumulation
-using ElementCompute      = float;                                          // Element type for epilogue computation
-using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
-using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-using TileShape           = Shape<_128,_128,_128>;                           // Threadblock-level tile size
-using ClusterShape        = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
-using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
-using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
+using ElementAccumulator        = float;                                          // Element type for internal accumulation
+using ElementBlockScale         = float;                                          // Element type for blockscaling during accumulation
+using ElementCompute            = float;                                          // Element type for epilogue computation
+using ArchTag                   = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
+using OperatorClass             = cutlass::arch::OpClassTensorOp;                 // Operator class tag
+using TileShape                 = Shape<_128,_128,_128>;                           // Threadblock-level tile size
+using ClusterShape              = Shape<_1,_2,_1>;                                // Shape of the threadblocks in a cluster
 
-using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
-using FusionOperation     = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
-    LayoutAux, cutlass::epilogue::thread::ReLU, ElementD, ElementCompute, ElementAux, ElementAmax, ElementBias, ElementC>;
+// Kernel and epilogue schedules
+using BlockScaleKernelSchedule  = cutlass::gemm::KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum;
+using KernelSchedule            = cutlass::gemm::KernelTmaWarpSpecializedCooperative;
+using EpilogueSchedule          = cutlass::epilogue::TmaWarpSpecializedCooperative;
+
+using EpilogueTileType          = cutlass::epilogue::collective::EpilogueTileAuto;
+using FusionOperation           = cutlass::epilogue::fusion::ScaledLinCombPerRowBiasEltActAmaxAux<
+                                    LayoutAux, cutlass::epilogue::thread::ReLU,
+                                    ElementD, ElementCompute,
+                                    ElementAux, ElementAmax, ElementBias, ElementC>;
 
 using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBuilder<
     ArchTag, OperatorClass,
@@ -149,6 +154,7 @@ using CollectiveEpilogue = typename cutlass::epilogue::collective::CollectiveBui
     FusionOperation
   >::CollectiveOp;
 
+////////////////////////////  Create Blocked Scale GEMM Kernel and Device Type /////////////////////////
 using CollectiveMainloopWithBlockWiseScaling = typename cutlass::gemm::collective::CollectiveBuilder<
     ArchTag, OperatorClass,
     ElementA, LayoutA, AlignmentA,
@@ -158,27 +164,50 @@ using CollectiveMainloopWithBlockWiseScaling = typename cutlass::gemm::collectiv
     cutlass::gemm::collective::StageCountAutoCarveout<
       static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
     >,
-    KernelSchedule
+    BlockScaleKernelSchedule
   >::CollectiveOp;
 
-using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
+using GemmBlockScaleKernel = cutlass::gemm::kernel::GemmUniversal<
     Shape<int,int,int,int>, // Indicates ProblemShape
     CollectiveMainloopWithBlockWiseScaling,
     CollectiveEpilogue
 >;
 
+using BlockScaledGemm = cutlass::gemm::device::GemmUniversalAdapter<GemmBlockScaleKernel>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+////////////////////////////  Create GEMM Kernel and Device Type ///////////////////////////////////////
+using CollectiveMainloop = typename cutlass::gemm::collective::CollectiveBuilder<
+    ArchTag, OperatorClass,
+    ElementA, LayoutA, AlignmentA,
+    ElementB, LayoutB, AlignmentB,
+    ElementAccumulator,
+    TileShape, ClusterShape,
+    cutlass::gemm::collective::StageCountAutoCarveout<
+      static_cast<int>(sizeof(typename CollectiveEpilogue::SharedStorage))
+    >,
+    BlockScaleKernelSchedule
+  >::CollectiveOp;
+
+using GemmKernel = cutlass::gemm::kernel::GemmUniversal<
+    Shape<int,int,int,int>, // Indicates ProblemShape
+    CollectiveMainloop,
+    CollectiveEpilogue
+>;
+
 using Gemm = cutlass::gemm::device::GemmUniversalAdapter<GemmKernel>;
+////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 // Extract information from Gemm kernel.
-using EpilogueOutputOp  = typename Gemm::EpilogueOutputOp;
+using EpilogueOutputOp  = typename BlockScaledGemm::EpilogueOutputOp;
 using ElementScalar     = typename EpilogueOutputOp::ElementScalar;
 using ElementAmax       = typename EpilogueOutputOp::ElementAmax;
 using ActivationFunctor = typename EpilogueOutputOp::ActivationFn;
 
-using StrideA = typename Gemm::GemmKernel::StrideA;
-using StrideB = typename Gemm::GemmKernel::StrideB;
-using StrideC = typename Gemm::GemmKernel::StrideC;
-using StrideD = typename Gemm::GemmKernel::StrideD;
+using StrideA = typename BlockScaledGemm::GemmKernel::StrideA;
+using StrideB = typename BlockScaledGemm::GemmKernel::StrideB;
+using StrideC = typename BlockScaledGemm::GemmKernel::StrideC;
+using StrideD = typename BlockScaledGemm::GemmKernel::StrideD;
 using StrideAux = StrideD;
 
 constexpr bool IsDFp8 =
@@ -453,10 +482,10 @@ void initialize(const Options<RasterOrderOptions> &options) {
   }
 }
 
-/// Populates a Gemm::Arguments structure from the given commandline options
-typename Gemm::Arguments args_from_options(const Options<RasterOrderOptions> &options)
+/// Populates a BlockScaledGemm::Arguments structure from the given commandline options
+typename BlockScaledGemm::Arguments args_from_options(const Options<RasterOrderOptions> &options)
 {
-  typename Gemm::Arguments arguments{
+  typename BlockScaledGemm::Arguments arguments{
     cutlass::gemm::GemmUniversalMode::kGemm,
     {options.m, options.n, options.k, options.l},
     {tensor_A.device_data(),
@@ -615,15 +644,6 @@ bool verify(const Options<RasterOrderOptions> &options) {
   tensor_D.sync_host();
   bool passed = cutlass::reference::host::TensorEquals(tensor_ref_D.host_view(), tensor_D.host_view());
 
-  if (false) {
-    std::cout << "tensor_ref_D.host_view() {" << std::endl
-              << tensor_ref_D.host_view() << std::endl
-              << "}"  << std::endl;
-    std::cout << "tensor_D.host_view() {" << std::endl
-              << tensor_D.host_view() << std::endl
-              << "}"  << std::endl;
-  }
-
   if (IsDFp8 && options.save_amax) {
     abs_max_D.sync_host();
     passed &= abs_max_D.at(cutlass::make_Coord(0)) == reference_abs_max_D.at(cutlass::make_Coord(0));
@@ -642,19 +662,19 @@ bool verify(const Options<RasterOrderOptions> &options) {
 }
 
 /// Execute a given example GEMM computation
-template <typename Gemm>
+template <typename BlockScaledGemm>
 int run(Options<RasterOrderOptions> &options)
 {
   initialize(options);
 
   // Instantiate CUTLASS kernel depending on templates
-  Gemm gemm;
+  BlockScaledGemm gemm;
 
-  // Create a structure of gemm kernel arguments suitable for invoking an instance of Gemm
+  // Create a structure of gemm kernel arguments suitable for invoking an instance of BlockScaledGemm
   auto arguments = args_from_options(options);
 
   // Using the arguments, query for extra workspace required for matrix multiplication computation
-  size_t workspace_size = Gemm::get_workspace_size(arguments);
+  size_t workspace_size = BlockScaledGemm::get_workspace_size(arguments);
 
   // Allocate workspace memory
   cutlass::device_memory::allocation<uint8_t> workspace(workspace_size);
@@ -674,9 +694,9 @@ int run(Options<RasterOrderOptions> &options)
 
   std::cout << "  Disposition: " << (result.passed ? "Passed" : "Failed") << std::endl;
 
-  // if (!result.passed) {
-  //  exit(-1);
-  // }
+  if (!result.passed) {
+   exit(-1);
+  }
 
   // Run profiling loop
   if (options.iterations > 0)
@@ -754,7 +774,7 @@ int main(int argc, char const **args) {
   //
 
 #if defined(CUTLASS_ARCH_MMA_SM90_SUPPORTED)
-  run<Gemm>(options);
+  run<BlockScaledGemm>(options);
 #endif
 
   return 0;
