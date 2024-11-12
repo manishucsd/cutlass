@@ -84,28 +84,4 @@ struct CollectiveBuilder {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-// TODO: Should we add additional enum to exisiting CollectiveBuilder specialize on 
-//  (a) ScalingKind::kTensorWise (b) ScalingKind::Blockwise (adding these new enum)
-template <
-  class ArchTag,
-  class OpClass,
-  class ElementA,
-  class GmemLayoutA,
-  int AlignmentA,
-  class ElementB,
-  class GmemLayoutB,
-  int AlignmentB,
-  class ElementAccumulator,
-  class TileShape_MNK,
-  class ClusterShape_MNK,
-  class StageCountType,
-  class KernelScheduleType,
-  class Enable = void
->
-struct CollectiveBlockScalingBuilder {
-  static_assert(sizeof(ElementA) == 0, "Could not build a collective for given parameters.");
-};
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
 } // namespace cutlass::gemm::collective

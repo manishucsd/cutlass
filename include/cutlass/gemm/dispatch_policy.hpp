@@ -106,8 +106,7 @@ struct KernelCpAsyncWarpSpecializedCooperative { };
 struct KernelTma { };
 struct KernelTmaWarpSpecialized { };
 struct KernelTmaWarpSpecializedPingpong { };
-struct KernelTmaWarpSpecializedCooperative { 
-};
+struct KernelTmaWarpSpecializedCooperative { };
 
 struct KernelPtrArrayTmaWarpSpecializedCooperative { };
 struct KernelPtrArrayTmaWarpSpecializedPingpong { };
@@ -125,6 +124,9 @@ struct KernelTmaWarpSpecializedPingpongFP8FastAccum : KernelTmaWarpSpecializedPi
 struct KernelTmaWarpSpecializedCooperativeFP8FastAccum: KernelTmaWarpSpecializedCooperative { };
 struct KernelPtrArrayTmaWarpSpecializedCooperativeFP8FastAccum : KernelPtrArrayTmaWarpSpecializedCooperative { };
 struct KernelPtrArrayTmaWarpSpecializedPingpongFP8FastAccum : KernelPtrArrayTmaWarpSpecializedPingpong { };
+
+// FP8 related policies (including Blocked Scaled Accumulation)
+struct KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum: KernelTmaWarpSpecializedCooperative { };
 
 // Policies to opt into mixed type GEMMs
 struct KernelTmaWarpSpecializedMixedInput : KernelTmaWarpSpecialized { };
@@ -298,9 +300,7 @@ template<
 struct MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8
   : MainloopSm90TmaGmmaWarpSpecialized<Stages_, ClusterShape_, KernelSchedule> {
   static_assert(
-    cute::is_same_v<KernelSchedule, KernelTmaWarpSpecialized> ||
-    cute::is_same_v<KernelSchedule, KernelTmaWarpSpecializedPingpong> ||
-    cute::is_same_v<KernelSchedule, KernelTmaWarpSpecializedCooperative>,
+    cute::is_same_v<KernelSchedule, KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum>,
     "KernelSchedule must be one of the warp specialized policies");
 };
 
@@ -338,4 +338,3 @@ struct MainloopSm90TmaGmmaWarpSpecializedSparse {
 //////////////////////////////////////////////////////////////////////////////
 
 } // namespace cutlass::gemm
-
