@@ -1008,7 +1008,7 @@ template <
   class TileShape_MNK,
   class ClusterShape_MNK,
   class StageCountType,
-  class KernelScheduleType
+  int ScaleGranularityM
 >
 struct CollectiveBuilder<
     arch::Sm90,
@@ -1023,12 +1023,12 @@ struct CollectiveBuilder<
     TileShape_MNK,
     ClusterShape_MNK,
     StageCountType,
-    KernelScheduleType,
+    KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<ScaleGranularityM>,
     cute::enable_if_t<
-      (cute::is_any_of_v<KernelScheduleType,
-                         KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum>) &&
-       not detail::is_use_rmem_A<ElementA, GmemLayoutATag, ElementB, GmemLayoutBTag>()>
+      not detail::is_use_rmem_A<ElementA, GmemLayoutATag, ElementB, GmemLayoutBTag>()>
 > {
+  using KernelScheduleType = KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<ScaleGranularityM>;
+
   static_assert(is_static<TileShape_MNK>::value);
   static_assert(is_static<ClusterShape_MNK>::value);
 #ifndef CUTLASS_SM90_COLLECTIVE_BUILDER_SUPPORTED
@@ -1054,7 +1054,7 @@ struct CollectiveBuilder<
   static constexpr bool IsCooperative = cute::is_any_of_v<KernelScheduleType,
                                                           KernelTmaWarpSpecializedCooperative,
                                                           KernelPtrArrayTmaWarpSpecializedCooperative,
-                                                          KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum>;
+                                                          KernelTmaWarpSpecializedCooperativeFP8BlockScaledAccum<ScaleGranularityM>>;
   using AtomLayoutMNK = cute::conditional_t<IsCooperative,
       Layout<Shape<_2,_1,_1>>, Layout<Shape<_1,_1,_1>>>;
 
@@ -1074,7 +1074,7 @@ struct CollectiveBuilder<
 
   static constexpr int PipelineStages = detail::compute_stage_count_or_override<detail::sm90_smem_capacity_bytes - KernelSmemCarveout,
       ElementAMma, ElementBMma, TileShape_MNK>(StageCountType{});
-  using DispatchPolicy = MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8<PipelineStages, ClusterShape_MNK, KernelScheduleType>;
+  using DispatchPolicy = MainloopSm90TmaGmmaWarpSpecializedBlockScalingFP8<PipelineStages, ClusterShape_MNK, KernelScheduleType, ScaleGranularityM>;
 
   using SmemCopyAtomA = void;
   using SmemCopyAtomB = void;
