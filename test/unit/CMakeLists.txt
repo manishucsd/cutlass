@@ -141,6 +141,7 @@ set(SUBDIRS
   pipeline
   substrate
   cluster_launch
+  gemm_description
   )
 
 if(TARGET nvidia::nvrtc AND TARGET nvidia::cuda_driver)
