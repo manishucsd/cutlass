@@ -406,6 +406,38 @@ template <> struct IteratorAlgorithmMap<conv::IteratorAlgorithm::kFewChannels> {
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+template <typename T>
+struct KernelScheduleMap;
+
+// Specialize for Hopper KernelSchedule
+template <>
+struct KernelScheduleMap<cutlass::gemm::KernelTmaWarpSpecializedPingpong> {
+  static MainloopScheduleKind const kMainloopSchedule = MainloopScheduleKind::kWarpspecializedPingpong;
+  static AccumulationKind const kAccumKind = AccumulationKind::kDefault;
+  static EpilogueLoadInstructionKind const kEpilogueLoadInstruction = EpilogueLoadInstructionKind::kUnknown;
+  static MainloopLoadInstructionKind const kMainloopLoadInstruction = MainloopLoadInstructionKind::kTma;
+};
+
+template <>
+struct KernelScheduleMap<cutlass::gemm::KernelTmaWarpSpecializedCooperative> {
+  static MainloopScheduleKind const kMainloopSchedule = MainloopScheduleKind::kWarpspecializedCooperative;
+  static AccumulationKind const kAccumKind = AccumulationKind::kDefault;
+  static EpilogueLoadInstructionKind const kEpilogueLoadInstruction = EpilogueLoadInstructionKind::kUnknown;
+  static MainloopLoadInstructionKind const kMainloopLoadInstruction = MainloopLoadInstructionKind::kTma;
+};
+
+template <>
+struct KernelScheduleMap<cutlass::gemm::KernelTmaWarpSpecializedFP8FastAccum> {
+  static MainloopScheduleKind const kMainloopSchedule = MainloopScheduleKind::kWarpspecialized;
+  static AccumulationKind const kAccumKind = AccumulationKind::kFastAccum;
+  static EpilogueLoadInstructionKind const kEpilogueLoadInstruction = EpilogueLoadInstructionKind::kUnknown;
+  static MainloopLoadInstructionKind const kMainloopLoadInstruction = MainloopLoadInstructionKind::kTma;
+};
+
+// Specialize for Blackwell KernelSchedule
+
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
 template <typename Element, typename Layout>
 TensorDescription make_TensorDescription(int alignment = 1) {
   TensorDescription desc;

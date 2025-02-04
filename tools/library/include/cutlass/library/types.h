@@ -286,6 +286,40 @@ enum class RasterOrder {
   kInvalid
 };
 
+
+enum class MainloopScheduleKind {
+  kUnknown,
+  kMultistage,
+  kWarpspecialized,
+  kWarpspecializedPingpong,
+  kWarpspecializedCooperative,
+  kWarpspecilized1SM,
+  kWarpspecilized1SM,
+  kInvalid,
+};
+
+enum class MainloopLoadInstructionKind {
+  kUnknown,
+  kCpAsync,
+  kTma,
+  kInvalid,
+};
+
+enum class EpilogueLoadInstructionKind {
+  kUnknown,
+  kNoSmem,
+  kTma,
+  kInvalid,
+};
+
+/// Accumulation algorithm kind
+enum class AccumulationKind {
+  kUnknown,
+  kDefault, 
+  kFastAccum,
+  kInvalid,
+};
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 } // namespace library
