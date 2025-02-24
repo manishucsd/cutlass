@@ -263,11 +263,13 @@ struct PersistentTileSchedulerSm90Params {
     // In case the maximum number of clusters that could co-exist on the target device is
     // already calculated using cudaOccupancyMaxActiveClusters
     else if (max_active_clusters != 0) {
+      auto max_launchable_clusters = possibly_truncate(max_active_clusters, sm_count / cluster_size);
+
       if (raster_order == RasterOrder::AlongN) {
-        launch_grid.y = max_active_clusters * cluster_shape.n();
+        launch_grid.y = max_launchable_clusters * cluster_shape.n();
       }
       else {
-        launch_grid.x = max_active_clusters * cluster_shape.m();
+        launch_grid.x = max_launchable_clusters * cluster_shape.m();
       }
       CUTLASS_TRACE_HOST("get_grid_shape(): Proposed GridDims by the scheduler using cudaOccupancyMaxActiveClusters = "
           "(" << launch_grid.x << ", " << launch_grid.y << ", " << launch_grid.z << ")\n");
