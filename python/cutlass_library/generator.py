@@ -5879,6 +5879,7 @@ def GenerateSM90_TensorOp_mixed_dtype_WGMMA_gemm(manifest, cuda_version):
   # layouts for ABC, their alignments will be fixed later based on the data type
   layouts = [
     [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.ColumnMajor, 16]],
+    [[LayoutType.RowMajor, 16], [LayoutType.ColumnMajor, 16], [LayoutType.RowMajor, 16]],
   ]
 
   valid_types_for_a_b_acc = [
@@ -5907,8 +5908,8 @@ def GenerateSM90_TensorOp_mixed_dtype_WGMMA_gemm(manifest, cuda_version):
 
   math_instructions = generate_mixed_dtype_math_instructions_sm90(instantiation_level, valid_types_for_a_b_acc)
 
-  valid_types_for_d = [DataType.f32]
-  valid_types_for_c = [DataType.f32]
+  valid_types_for_d = [DataType.bf16]
+  valid_types_for_c = [DataType.bf16]
 
   tile_descriptions = generate_tile_descriptions_sm90(
     math_instructions=math_instructions,
