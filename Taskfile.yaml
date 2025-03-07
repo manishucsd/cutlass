@@ -1,0 +1,123 @@
+version: '3'
+
+tasks:
+
+  ####### Build and configure tasks #######
+
+  ### CMake SM90
+  cmake-sm90-bf16-bf16-tnn:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type bf16_bf16_tnn
+    desc: "Configure CMake for BF16 * BF16 TNN Sweeping."
+
+  cmake-sm90-fe4m3-bf16-tnn:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnn
+    desc: "Configure CMake for FE4M3 * BF16 TNN Sweeping."
+
+  cmake-sm90-fe4m3-bf16-tnt:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnt
+    desc: "Configure CMake for FE4M3 * BF16 TNT Sweeping."
+
+  cmake-sm90-grouped:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type grouped
+    desc: "Configure CMake for Grouped Sweeping."
+    
+  cmake-sm90-all:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping."
+    aliases: [cmake-sm90]
+
+  ### CMake SM100
+  cmake-sm100-all:
+    cmds:
+      -  source ./mycode/cmake/sm100_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping."
+    aliases: [cmake-sm100]
+
+  cmake-sm100-debug:
+    cmds:
+      -  CMAKE_BUILD_TYPE=Debug source ./mycode/cmake/sm100_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping in Debug mode."
+
+  cmake-sm100-lineinfo:
+    cmds:
+      -  CUTLASS_CUDA_NVCC_FLAGS="-lineinfo" source ./mycode/cmake/sm100_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping with lineinfo."
+  
+  ### Make cutlass_profiler
+  build-cutlass-profiler:
+    cmds:
+      - make -C ../build/ cutlass_profiler -j
+    desc: "Build cutlass_profiler."
+    aliases: [build-profiler]
+
+  ### NCU profile
+  ncu-profile-gemm-bf16:
+    cmds:
+      - task build-cutlass-profiler
+      - mkdir -p ncu_profile
+      - sudo --preserve-env=PATH,PYENV_VERSION bash -lc 
+        'ncu --import-source yes --set full --launch-skip 1 --launch-count 1 -k device_kernel -o ncu_profile/cutlass_gemm_bf16_%i 
+        ../build/tools/profiler/cutlass_profiler
+        --kernels=cutlass3x_sm100_tensorop_gemm_bf16_bf16_f32_void_f32_256x256x64_2x1x1_0_tnt_align8_2sm 
+        --m=4096 --n=4096 --k=8192 
+        --verification-enabled=false 
+        --warmup-iterations=1  
+        --profiling-iterations=1'
+    desc: "Run NCU profile for GEMM BF16"
+
+  ncu-profile-gemm-nvfp4:
+    cmds:
+      - task build-cutlass-profiler
+      - mkdir -p ncu_profile
+      - sudo --preserve-env=PATH,PYENV_VERSION bash -lc 
+        'ncu --import-source yes --set full --launch-skip 1 --launch-count 1 -k device_kernel -o ncu_profile/cutlass_gemm_nvfp4_%i 
+        ../build/tools/profiler/cutlass_profiler
+        --kernels=cutlass3x_sm100_bstensorop_gemm_ue4m3xe2m1_ue4m3xe2m1_f32_void_ue8m0xe2m1_256x256x256_2x1x1_0_tnt_align32_o_vs16_2sm_epiVs16t 
+        --m=4096 --n=4096 --k=8192 
+        --verification-enabled=false 
+        --warmup-iterations=1  
+        --profiling-iterations=1'
+    desc: "Run NCU profile for GEMM BF16"
+
+  ### Build tasks
+  build-example-77:
+    cmds:
+      - make -C ../build/ 77_blackwell_fmha_all -j
+    desc: "Build example 77."
+
+  ### Run / Test / Verify tasks
+  ### Profile tasks
+  profile-gen-problem-example-77-fmha:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=1 --k=8192 --persistent --verbose
+    desc: "Profile an inference (gen) shape with example 77 fmha."
+
+  profile-gen-problem-example-77-gen:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=1 --k=8192 --clear-cache --verbose --kernel-filter=UMMA_P
+    desc: "Profile an inference (gen) shape with example 77 gen."
+
+  profile-train-problem-example-77-fmha:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --persistent --verbose
+    desc: "Profile an training shape with example 77 fmha."
+
+  profile-train-problem-example-77-gen:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --clear-cache --verbose --kernel-filter=UMMA_P
+    desc: "Profile an training shape with example 77 gen."
+
+  ####### Cleaning tasks ########
+  clean:
+    cmds:
+      - rm -rf ../build
+    desc: "Clean up build dir."
