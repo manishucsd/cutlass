@@ -1,0 +1,71 @@
+version: '3'
+
+tasks:
+
+  ####### Build and configure tasks #######
+
+  ### CMake SM90
+  cmake-sm90-bf16-bf16-tnn:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type bf16_bf16_tnn
+    desc: "Configure CMake for BF16 * BF16 TNN Sweeping."
+
+  cmake-sm90-fe4m3-bf16-tnn:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnn
+    desc: "Configure CMake for FE4M3 * BF16 TNN Sweeping."
+
+  cmake-sm90-fe4m3-bf16-tnt:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnt
+    desc: "Configure CMake for FE4M3 * BF16 TNT Sweeping."
+
+  cmake-sm90-grouped:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type grouped
+    desc: "Configure CMake for Grouped Sweeping."
+    
+  cmake-sm90-all:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping."
+    aliases: [cmake-sm90]
+
+  ### CMake SM100
+  cmake-sm100-all:
+    cmds:
+      -  source ./mycode/cmake/sm100_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping."
+    aliases: [cmake-sm100]
+
+  ### Build tasks
+  build-example-77:
+    cmds:
+      - make -C ../build/ 77_blackwell_fmha_all -j
+    desc: "Build example 77."
+
+  ### Run / Test / Verify tasks
+  run-example-77-fmha:
+    cmds:
+      - task build-example-77
+      - ./mycode/build/77_blackwell_fmha_all
+    desc: "Run example 77 fmha."
+
+  ### Profile tasks
+  profile-example-77-fmha:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16  --b=1 --h=8 --h_k=4 --d=128 --q=2048 --k=8192
+    desc: "Profile example 77 fmha."
+
+  profile-example-77-gen:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16  --b=1 --h=8 --h_k=4 --d=128 --q=4 --k=8192
+    desc: "Profile example 77 gen."
+
+  ####### Cleaning tasks ########
+  clean:
+    cmds:
+      - rm -rf ../build
+    desc: "Clean up build dir."
