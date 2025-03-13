@@ -3,24 +3,32 @@ version: '3'
 tasks:
 
   ####### Build and configure tasks #######
-  cmake-bf16-bf16-tnn:
+
+  ### CMake SM90
+  cmake-sm90-bf16-bf16-tnn:
     cmds:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type bf16_bf16_tnn
     desc: "Configure CMake for BF16 * BF16 TNN Sweeping."
 
-  cmake-fe4m3-bf16-tnn:
+  cmake-sm90-fe4m3-bf16-tnn:
     cmds:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnn
     desc: "Configure CMake for FE4M3 * BF16 TNN Sweeping."
 
-  cmake-fe4m3-bf16-tnt:
+  cmake-sm90-fe4m3-bf16-tnt:
     cmds:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnt
     desc: "Configure CMake for FE4M3 * BF16 TNT Sweeping."
 
-  cmake-all:
+  cmake-sm90-all:
     cmds:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type all
+    desc: "Configure CMake for all Sweeping."
+
+  ### CMake SM100
+  cmake-sm100-all:
+    cmds:
+      -  source ./mycode/cmake/sm100_gemms.sh --gemm-type all
     desc: "Configure CMake for all Sweeping."
 
   ####### Cleaning tasks ########
