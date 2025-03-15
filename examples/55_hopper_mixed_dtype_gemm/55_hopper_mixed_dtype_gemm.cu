@@ -114,7 +114,7 @@ using namespace cute;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 using MmaType = cutlass::half_t;
 using QuantType = cutlass::float_e4m3_t;
-constexpr int TileShapeK = 128 * 8 / sizeof_bits<MmaType>::value;
+constexpr int TileShapeK = 128;
 
 // A matrix configuration
 using         ElementA    = MmaType;                                        // Element type for A matrix operand
@@ -149,8 +149,8 @@ using ElementAccumulator  = float;                                          // E
 using ElementCompute      = float;                                          // Element type for epilogue computation
 using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
 using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-using TileShape           = Shape<_128,_128,cute::Int<TileShapeK>>;         // Threadblock-level tile size
-using ClusterShape        = Shape<_1,_1,_1>;                                // Shape of the threadblocks in a cluster
+using TileShape           = cute::Shape<cute::_128, cute::_32, cute::_128>;         // Threadblock-level tile size
+using ClusterShape        = cute::Shape<cute::_8, cute::_1, cute::_1>;                                // Shape of the threadblocks in a cluster
 using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
 using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
 using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
