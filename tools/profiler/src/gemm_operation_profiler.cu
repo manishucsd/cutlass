@@ -513,6 +513,8 @@ Status GemmOperationProfiler::initialize_configuration(
     gemm_workspace_[i].arguments.cluster_shape_fallback = {int(problem_.cluster_m_fallback), int(problem_.cluster_n_fallback), int(problem_.cluster_k_fallback)}; 
     gemm_workspace_[i].arguments.split_k_slices = problem_.split_k_slices;
 
+    std::cout << "gemm_workspace_[i].configuration.cluster_shape = " << gemm_workspace_[i].configuration.cluster_shape << std::endl;
+    std::cout << "gemm_workspace_[i].arguments.cluster_shape = " << gemm_workspace_[i].arguments.cluster_shape << std::endl;
     
     gemm_workspace_[i].arguments.runtime_input_datatype_a = problem_.runtime_input_datatype_a;
     gemm_workspace_[i].arguments.runtime_input_datatype_b = problem_.runtime_input_datatype_b;
