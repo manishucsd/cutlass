@@ -43,6 +43,48 @@ set(TEST_SCALE_ZERO_RESIDUE --m=128 --n=128 --k=192 --g=128 --mode=2 --iteration
 
 set(TEST_ALPHA_BETA --alpha=0.5 --beta=0.7 --mode=2 --iterations=0)                      # Alpha and Beta with default shapes
 
+cutlass_example_add_executable(
+  55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_2x1x1
+  55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_2x1x1.cu
+  TEST_COMMAND_OPTIONS
+  TEST_DIRECT_BATCHED
+  TEST_SCALE_PERCOL
+  TEST_SCALE_ZERO_PERCOL
+  TEST_SCALE_GROUP
+  TEST_SCALE_ZERO_GROUPED
+  TEST_SCALE_RESIDUE
+  TEST_SCALE_ZERO_RESIDUE
+  # TEST_ALPHA_BETA
+)
+
+cutlass_example_add_executable(
+  55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_4x1x1
+  55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_4x1x1.cu
+  TEST_COMMAND_OPTIONS
+  TEST_DIRECT_BATCHED
+  TEST_SCALE_PERCOL
+  TEST_SCALE_ZERO_PERCOL
+  TEST_SCALE_GROUP
+  TEST_SCALE_ZERO_GROUPED
+  TEST_SCALE_RESIDUE
+  TEST_SCALE_ZERO_RESIDUE
+  # TEST_ALPHA_BETA
+)
+
+cutlass_example_add_executable(
+  55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_8x1x1
+  55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_8x1x1.cu
+  TEST_COMMAND_OPTIONS
+  TEST_DIRECT_BATCHED
+  TEST_SCALE_PERCOL
+  TEST_SCALE_ZERO_PERCOL
+  TEST_SCALE_GROUP
+  TEST_SCALE_ZERO_GROUPED
+  TEST_SCALE_RESIDUE
+  TEST_SCALE_ZERO_RESIDUE
+  # TEST_ALPHA_BETA
+  )
+
 
 cutlass_example_add_executable(
   55_hopper_mixed_dtype_gemm
@@ -79,3 +121,10 @@ cutlass_example_add_executable(
     TEST_SCALE_RESIDUE
     # TEST_ALPHA_BETA
     )
+
+
+add_custom_target(mixed_bf16_f8_many_cgas DEPENDS
+55_hopper_mixed_dtype_gemm
+55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_2x1x1 
+55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_4x1x1
+55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_8x1x1)
