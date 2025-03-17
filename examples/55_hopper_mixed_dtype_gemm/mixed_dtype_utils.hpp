@@ -195,8 +195,8 @@ bool initialize_tensor(
     scope_min = -2;
   }
   else if (bits_output == 16) {
-    scope_max = 5;
-    scope_min = -5;
+    scope_max = 3;
+    scope_min = -3;
   }
   else {
     scope_max = 8;
@@ -204,6 +204,20 @@ bool initialize_tensor(
   }
   cutlass::reference::device::BlockFillRandomUniform(
       block.get(), block.size(), seed, Element(scope_max), Element(scope_min));
+
+  return true;
+}
+
+template <typename Element>
+bool initialize_quant_tensor(
+  cutlass::DeviceAllocation<Element>& block,
+  uint64_t seed = 2023) {
+  
+  float scope_min = float(cutlass::platform::numeric_limits<Element>::lowest()) * 0.01f;
+  float scope_max = float(cutlass::platform::numeric_limits<Element>::max()) * 0.01f;
+
+  cutlass::reference::device::BlockFillRandomUniform(
+    block.get(), block.size(), seed, Element(scope_max), Element(scope_min));
 
   return true;
 }

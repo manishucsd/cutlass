@@ -116,7 +116,7 @@ using namespace cute;
 /////////////////////////////////////////////////////////////////////////////////////////////////
 using MmaType = cutlass::half_t;
 using QuantType = cutlass::float_e4m3_t;
-constexpr int TileShapeK = 128 * 8 / sizeof_bits<MmaType>::value;
+constexpr int TileShapeK = 128;
 
 // A matrix configuration
 using         ElementA    = MmaType;                                        // Element type for A matrix operand
@@ -151,8 +151,8 @@ using ElementAccumulator  = float;                                          // E
 using ElementCompute      = float;                                          // Element type for epilogue computation
 using ArchTag             = cutlass::arch::Sm90;                            // Tag indicating the minimum SM that supports the intended feature
 using OperatorClass       = cutlass::arch::OpClassTensorOp;                 // Operator class tag
-using TileShape           = Shape<_128,_128,cute::Int<TileShapeK>>;         // Threadblock-level tile size
-using ClusterShape        = Shape<_1,_1,_1>;                                // Shape of the threadblocks in a cluster
+using TileShape           = cute::Shape<cute::_128, cute::_32, cute::_128>;         // Threadblock-level tile size
+using ClusterShape        = cute::Shape<cute::_2, cute::_1, cute::_1>;                                // Shape of the threadblocks in a cluster
 using KernelSchedule      = cutlass::gemm::KernelTmaWarpSpecializedCooperative;  // Kernel to launch based on the default setting in the Collective Builder 
 using EpilogueSchedule    = cutlass::epilogue::TmaWarpSpecializedCooperative;
 using EpilogueTileType    = cutlass::epilogue::collective::EpilogueTileAuto;
@@ -292,7 +292,7 @@ cutlass::HostTensor<ElementD, LayoutD> host_ref_D;
 void initialize(MixedDtypeOptions const& options) {
 
   auto shape_b = cute::make_shape(options.n, options.k, options.l);
-  int const scale_k = cutlass::ceil_div(options.k, options.g);
+  int const scale_k = (options.k + options.g - 1) / options.g;
   stride_A = cutlass::make_cute_packed_stride(StrideA{}, cute::make_shape(options.m, options.k, options.l));
   stride_B = cutlass::make_cute_packed_stride(StrideB{}, shape_b);
   // Reverse stride here due to swap and transpose
@@ -312,14 +312,14 @@ void initialize(MixedDtypeOptions const& options) {
   block_C.reset(c_coord.product());
   block_D.reset(c_coord.product());
   block_ref_D.reset(c_coord.product());
-
-  block_scale.reset(scale_k * options.l * options.n);
-  block_zero.reset(scale_k * options.l * options.n);
   host_D.resize(c_coord);
   host_ref_D.resize(c_coord);
 
+  block_scale.reset(scale_k * options.l * options.n);
+  block_zero.reset(scale_k * options.l * options.n);
+
   initialize_tensor(block_A, seed + 2022);
-  initialize_tensor(block_B, seed + 2021);
+  initialize_quant_tensor(block_B, seed + 2021);
   initialize_tensor(block_C, seed + 2020);
   initialize_scale(block_scale, options);
   initialize_zero(block_zero, options);
@@ -429,16 +429,17 @@ bool verify(MixedDtypeOptions const& options) {
   // compare_reference
   ElementD const epsilon(1e-2f);
   ElementD const non_zero_floor(1e-4f);
-  bool passed = cutlass::reference::device::BlockCompareRelativelyEqual(block_ref_D.get(), block_D.get(), block_D.size(), epsilon, non_zero_floor);
-  
   block_ref_D.copy_to_host(host_ref_D.host_data());
   block_D.copy_to_host(host_D.host_data());
 
-  if (true) {
-    std::ofstream file("55_hopper_mixed_dtype_gemm_D.txt");
+  bool passed = cutlass::reference::device::BlockCompareRelativelyEqual(block_ref_D.get(), block_D.get(), block_D.size(), epsilon, non_zero_floor);
+  
+  if (!passed) {
+    std::cerr << "Error - output does not match reference." << std::endl;
+    std::ofstream file("55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_2x1x1_D.txt");
     file << host_D.host_view() << std::endl;
 
-    std::ofstream file_ref("55_hopper_mixed_dtype_gemm_ref_D.txt");
+    std::ofstream file_ref("55_hopper_mixed_dtype_gemm_cta_128x32x128_cga_2x1x1_ref_D.txt");
     file_ref << host_ref_D.host_view() << std::endl;
   }
   return passed;
