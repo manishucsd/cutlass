@@ -63,16 +63,7 @@ shfl,\
 scl,\
 sclzr,\
 stream_k,\
-1x2x1*pingpong,\
-2x1x1*pingpong,\
-2x2x1*pingpong,\
-4x1x1*pingpong,\
-1x4x1*pingpong,\
-4x2x1*pingpong,\
-2x4x1*pingpong,\
-4x4x1*pingpong,\
-8x1x1*pingpong,\
-1x8x1*pingpong"
+"
 
 ### Check if sccache is available in the path
 if command -v sccache &> /dev/null; then

@@ -24,12 +24,14 @@ tasks:
     cmds:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type all
     desc: "Configure CMake for all Sweeping."
+    aliases: [cmake-sm90]
 
   ### CMake SM100
   cmake-sm100-all:
     cmds:
       -  source ./mycode/cmake/sm100_gemms.sh --gemm-type all
     desc: "Configure CMake for all Sweeping."
+    aliases: [cmake-sm100]
 
   ####### Cleaning tasks ########
   clean:
