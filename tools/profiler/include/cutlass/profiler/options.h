@@ -84,6 +84,8 @@ public:
     /// Device ID
     std::vector<int> devices;
 
+
+
     /// Number of total devices
     /// This is not set by the user, it is set by automatically
     int num_devices;
@@ -112,6 +114,7 @@ public:
     /// Returns the device ID from a device index
     int device_id(size_t device_index) const;
 
+    
     /// Returns the sm_count if set, otherwise returns the number of SMs on the device
     int get_sm_count(int device_index) const;
 
