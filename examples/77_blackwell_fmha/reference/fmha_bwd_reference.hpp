@@ -33,7 +33,8 @@
 #pragma once
 
 #include "cute/tensor.hpp"
-
+#include "collective/fmha_fusion.hpp"
+#include "collective/fmha_common.hpp"
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 template<

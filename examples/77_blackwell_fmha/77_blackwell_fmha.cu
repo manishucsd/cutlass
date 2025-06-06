@@ -621,6 +621,25 @@ struct FwdRunner {
       get<1>(problem_shape).cumulative_length = buffers[0]->device_cumulative_seqlen_kv.get();
     }
 
+    printf("get<0>problem_shape: "); print(get<0>(problem_shape)); print("\n");
+    printf("get<1>problem_shape: "); print(get<1>(problem_shape)); print("\n");
+
+    printf("SQ (size<0>(problem_size)): %d\n", SQ);
+    printf("SK (size<1>(problem_size)): %d\n", SK);
+    printf("D (size<2>(problem_size)): %d\n", D);
+    printf("H (size<3,0>(problem_size)): %d\n", H);
+    printf("H_K (size<3,0,1>(problem_size)): %d\n", H_K);
+    printf("H_Q (size<3,0,0>(problem_size)): %d\n", H_Q);
+    printf("B (size<3,1>(problem_size)): %d\n", B);
+    
+    printf("shape_QO   :"); print(shape_QO); print("\n");
+    printf("stride_Q   : "); print(stride_Q); print("\n");
+    printf("shape_KV   :"); print(shape_KV); print("\n");
+    printf("stride_K   : "); print(stride_K); print("\n");
+    printf("stride_V   : "); print(stride_V); print("\n");
+    printf("shape_LSE  :"); print(shape_LSE); print("\n");
+    printf("stride_LSE : "); print(stride_LSE); print("\n");
+    
     return problem_shape;
   }
 
