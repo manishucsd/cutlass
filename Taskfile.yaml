@@ -33,6 +33,12 @@ tasks:
     desc: "Configure CMake for all Sweeping."
     aliases: [cmake-sm100]
 
+  ### Make tasks
+  make-example-77:
+    cmds:
+      - make -C ../build/ 77_blackwell_fmha_all -j
+    desc: "Build example 77."
+
   ####### Cleaning tasks ########
   clean:
     cmds:
