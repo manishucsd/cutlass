@@ -20,6 +20,11 @@ tasks:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type fe4m3_bf16_tnt
     desc: "Configure CMake for FE4M3 * BF16 TNT Sweeping."
 
+  cmake-sm90-grouped:
+    cmds:
+      -  source ./mycode/cmake/sm90_gemms.sh --gemm-type grouped
+    desc: "Configure CMake for Grouped Sweeping."
+    
   cmake-sm90-all:
     cmds:
       -  source ./mycode/cmake/sm90_gemms.sh --gemm-type all

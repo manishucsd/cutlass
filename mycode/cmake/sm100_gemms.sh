@@ -1,12 +1,15 @@
 ### Define CUTLASS_LIBRARY_KERNELS strings for different GEMM types
 BF16="\
-cutlass3x_sm100_tensorop_s256x256x16gemm_bf16_bf16_f32_void_f32_256x256x64_2x1x1_0_tnt_align8_2sm"
+cutlass3x_sm100_tensorop_gemm_bf16_bf16_f32_void_f32_256x256x64_2x1x1_0_tnt_align8_2sm"
 
 FP8="\
-cutlass3x_sm100_tensorop_s128x128x32gemm_f8_f8_f32_bf16_bf16_128x128x128_2x1x1_0_tnt_align16_2sm_epi_tma"
+cutlass3x_sm100_tensorop_gemm_f8_f8_f32_bf16_bf16_128x128x128_2x1x1_0_tnt_align16_2sm_epi_tma"
 
 FE2M1="\
-cutlass3x_sm100_tensorop_s256x256x32gemm_e2m1_e2m1_f32_void_f32_256x256x128_2x1x1_0_tnt_align128_2sm"
+cutlass3x_sm100_tensorop_gemm_e2m1_e2m1_f32_void_f32_256x256x128_2x1x1_0_tnt_align128_2sm"
+
+GROUPED="\
+cutlass3x_sm100_tensorop_gemm_grouped_bf16_bf16_f32_void_f32_256x256x64_2x1x1_0_tnt_align8_2sm"
 
 #### Parse the command-line arguments
 GEMM_TYPE="bf16"
@@ -36,8 +39,11 @@ case $GEMM_TYPE in
     fe1m2)
         CUTLASS_LIBRARY_KERNELS=$FE2M1
         ;;
+    grouped)
+        CUTLASS_LIBRARY_KERNELS=$GROUPED
+        ;;
     all)
-        CUTLASS_LIBRARY_KERNELS="$BF16,$FP8,$FE2M1"
+        CUTLASS_LIBRARY_KERNELS="$BF16,$FP8,$FE2M1,$GROUPED"
         ;;
     *)
         echo "Unknown GEMM_TYPE: $GEMM_TYPE"
