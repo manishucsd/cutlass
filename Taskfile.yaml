@@ -45,24 +45,30 @@ tasks:
     desc: "Build example 77."
 
   ### Run / Test / Verify tasks
-  run-example-77-fmha:
-    cmds:
-      - task build-example-77
-      - ./mycode/build/77_blackwell_fmha_all
-    desc: "Run example 77 fmha."
-
   ### Profile tasks
-  profile-example-77-fmha:
+  profile-gen-problem-example-77-fmha:
     cmds:
       - task build-example-77
-      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16  --b=1 --h=8 --h_k=4 --d=128 --q=2048 --k=8192
-    desc: "Profile example 77 fmha."
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=1 --k=8192 --persistent --verbose
+    desc: "Profile an inference (gen) shape with example 77 fmha."
 
-  profile-example-77-gen:
+  profile-gen-problem-example-77-gen:
     cmds:
       - task build-example-77
-      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16  --b=1 --h=8 --h_k=4 --d=128 --q=4 --k=8192
-    desc: "Profile example 77 gen."
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=1 --k=8192 --clear-cache --verbose --kernel-filter=UMMA_P
+    desc: "Profile an inference (gen) shape with example 77 gen."
+
+  profile-train-problem-example-77-fmha:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --persistent --verbose
+    desc: "Profile an training shape with example 77 fmha."
+
+  profile-train-problem-example-77-gen:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --clear-cache --verbose --kernel-filter=UMMA_P
+    desc: "Profile an training shape with example 77 gen."
 
   ####### Cleaning tasks ########
   clean:
