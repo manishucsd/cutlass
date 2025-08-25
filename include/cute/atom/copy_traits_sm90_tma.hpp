@@ -72,7 +72,7 @@ struct TMA_LOAD_Unpack
 
     auto src_coord = src(Int<0>{});
     void* dst_ptr = cute::raw_pointer_cast(dst.data());
-#if 0
+#if 1
     auto [c0,c1,c2,c3,c4] = append<5>(src_coord, 0);
     printf("THR (%d,%d,%d) BLK (%d,%d,%d) TMACRD (%d,%d,%d,%d,%d) SMEMADDR (%p)\n",
           threadIdx.x, threadIdx.y, threadIdx.z,
@@ -1019,6 +1019,19 @@ make_tma_copy_desc(Tensor<GEngine,GLayout> const& gtensor,         // The origin
         smem_swizzle,
         tma_l2Promotion,
         tma_oobFill);
+
+      std::cout << "TMA Desc Addr:   " << &tma_desc
+                << "\nformat         " << tma_format
+                << "\ndim            " << tma_dim
+                << "\ngmem_address   " << gmem_address
+                << "\nglobalDim      " << gmem_prob_shape
+                << "\nglobalStrides  " << gmem_prob_stride
+                << "\nboxDim         " << smem_box_shape
+                << "\nelementStrides " << smem_box_stride
+                << "\ninterleave     " << tma_interleave
+                << "\nswizzle        " << smem_swizzle
+                << "\nl2Promotion    " << tma_l2Promotion
+                << "\noobFill        " << tma_oobFill << std::endl;
 
     if (result != CUDA_SUCCESS) {
       std::cerr << "TMA Desc Addr:   " << &tma_desc
