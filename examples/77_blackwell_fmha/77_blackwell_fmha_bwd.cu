@@ -630,6 +630,12 @@ struct BwdRunner {
     block_O.reset(lsize(shape_O));
     block_LSE.reset(lsize(shape_LSE));
 
+    printf("lsize(shape_Q): %lld\n", lsize(shape_Q));
+    printf("size_K: %lld\n", size_K);
+    printf("size_V: %lld\n", size_V);
+    printf("lsize(shape_O): %lld\n", lsize(shape_O));
+    printf("lsize(shape_LSE): %lld\n", lsize(shape_LSE));
+
     block_dQ.reset(lsize(shape_Q));
     block_dK.reset(size_K);
     block_dV.reset(size_V);
@@ -670,6 +676,21 @@ struct BwdRunner {
     Tensor mLSE = make_tensor(make_gmem_ptr(block_LSE.get()),
       select<0,4>(problem_shape),
       stride_LSE);
+
+    printf("shape_Q: "); print(shape_Q); printf("\n");
+    printf("stride_Q: "); print(stride_Q); printf("\n");
+
+    printf("shape_K: "); print(shape_K); printf("\n");
+    printf("stride_K: "); print(stride_K); printf("\n");
+
+    printf("shape_V: "); print(shape_V); printf("\n");
+    printf("stride_V: "); print(stride_V); printf("\n");
+
+    printf("shape_O: "); print(shape_O); printf("\n");
+    printf("stride_O: "); print(stride_O); printf("\n");
+
+    printf("shape_LSE: "); print(shape_LSE); printf("\n");
+    printf("stride_LSE: "); print(stride_LSE); printf("\n");
 
     if (not options.skip_reference) {
       fmha_reference(problem_shape, mQ, mK, mV, mO, mLSE, ActiveMask{});

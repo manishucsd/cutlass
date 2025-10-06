@@ -116,6 +116,12 @@ tasks:
       - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_gen_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --clear-cache --verbose --kernel-filter=UMMA_P
     desc: "Profile an training shape with example 77 gen."
 
+  profile-train-problem-example-77-bwd-varlen:
+    cmds:
+      - task build-example-77
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_bwd_fp16 --b=1 --h=4 --h_k=4 --d=128 --varlen --mask=residual --varlen-q=256 --varlen-k=512  --verbose --verify 
+    desc: "Profile an training varlen shape with example 77 fmha."
+  
   ####### Cleaning tasks ########
   clean:
     cmds:
