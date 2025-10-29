@@ -84,6 +84,17 @@ tasks:
         --profiling-iterations=1'
     desc: "Run NCU profile for GEMM BF16"
 
+  ncu-profile-example-77-fmha:
+    cmds:
+      - task build-example-77
+      - mkdir -p ncu_profile
+      - sudo --preserve-env=PATH,PYENV_VERSION bash -lc 
+        'ncu --import-source yes --set full --launch-skip 1 --launch-count 1 -k device_kernel -o ncu_profile/cutlass_example_77_fmha_%i 
+        ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16
+        --kernels=77_blackwell_fmha_fp16
+        --b=8 --h=8 --h_k=8 --d=128 --q=2304 --k=8192  --mask=causal --persistent'
+    desc: "Run NCU profile for example 77 fmha"
+
   ### Build tasks
   build-example-77:
     cmds:
@@ -107,7 +118,13 @@ tasks:
   profile-train-problem-example-77-fmha:
     cmds:
       - task build-example-77
-      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --persistent --verbose
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=8 --h=8 --h_k=8 --d=128 --q=2304 --k=8192 --varlen --persistent --verbose
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=8192 --k=8192 --varlen --persistent --verbose
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=16384 --k=16384 --varlen --persistent --verbose
+      # thin q
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=128 --k=16384 --varlen --persistent --verbose
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=256 --k=16384 --varlen --persistent --verbose
+      - ../build/examples/77_blackwell_fmha/77_blackwell_fmha_fp16 --b=1 --h=8 --h_k=8 --d=128 --q=512 --k=16384 --varlen --persistent --verbose
     desc: "Profile an training shape with example 77 fmha."
 
   profile-train-problem-example-77-gen:
